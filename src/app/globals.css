@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Array-Semibold';
+  src: url('/fonts/Array-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'ClashDisplay-Semibold';
+  src: url('/fonts/ClashDisplay-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+  font-style: normal;
+}
+
+@theme {
+  --color-accent: #C44900;
+  --color-accent-dark: #9E3B00;
+  --color-canvas: #f8f8f8;
+  --color-ink: #0f172a;
+  --color-surface-dark: #141313;
+
+  --font-sans: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: var(--font-roboto-mono), 'Roboto Mono', monospace;
+  --font-array-semibold: 'Array-Semibold', sans-serif;
+  --font-clash-semibold: 'ClashDisplay-Semibold', sans-serif;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+  background-color: #f8f8f8;
+  color: #000000;
+  -webkit-tap-highlight-color: rgba(196, 73, 0, 0.14);
+}
+
+/* Prevent iOS Safari auto-zoom on form controls */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+

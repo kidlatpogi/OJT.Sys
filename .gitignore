@@ -1,0 +1,29 @@
+# Dependencies & Build Outputs
+node_modules/
+.next/
+.next-verify/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment & Secrets (Excluded from Git)
+.env
+.env.example
+.env.local
+.env.*.local
+
+# Institutional DOCX Templates (Excluded from Git)
+SECA-CTNTERN-003-ATTENDANCE REPORT.docx
+SECA-CTNTERN-004-Weekly Report Template.docx
+SECA-CTNTERN-005-Monthly Report Template.docx
+templates/
+
+# Logs & OS Files
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
