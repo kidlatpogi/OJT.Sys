@@ -176,8 +176,8 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
       {isModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 border-t-2 sm:border-2 border-slate-200 max-h-[90dvh] overflow-y-auto safe-bottom">
+          <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <div className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-200 max-h-[84dvh] overflow-y-auto shadow-2xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-clash-semibold text-xl font-bold text-black">
                   {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
