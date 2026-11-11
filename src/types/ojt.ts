@@ -15,6 +15,7 @@ export interface UserProfile {
   daily_end_time: string;
   lunch_break_minutes: number;
   auto_time_out?: boolean;
+  document_checklist?: string[];
   academic_term: string;
 }
 

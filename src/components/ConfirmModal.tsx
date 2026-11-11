@@ -29,11 +29,16 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   useEffect(() => {
     if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !loading) onCancel();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
   }, [isOpen, loading, onCancel]);
 
   if (!isOpen || typeof document === 'undefined') return null;
@@ -42,7 +47,7 @@ export default function ConfirmModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
       onClick={() => {
         if (!loading) onCancel();
       }}
@@ -52,7 +57,7 @@ export default function ConfirmModal({
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 border-t-2 sm:border-2 border-slate-200 shadow-2xl safe-bottom"
+        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-200 shadow-2xl max-h-[84dvh] overflow-y-auto"
       >
         <div className="flex items-start justify-between gap-3">
           <h3

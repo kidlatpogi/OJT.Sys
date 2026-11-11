@@ -2,6 +2,9 @@
 node_modules/
 .next/
 .next-verify/
+.open-next/
+.wrangler/
+.dev.vars
 out/
 dist/
 build/

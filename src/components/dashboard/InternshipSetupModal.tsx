@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Building2, Clock } from 'lucide-react';
 import { UserProfile } from '@/types/ojt';
 
@@ -47,9 +48,11 @@ export default function InternshipSetupModal({
     setSaving(false);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 border-t-2 sm:border-2 border-slate-200 max-h-[92dvh] overflow-y-auto safe-bottom shadow-xl">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[105] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-8 border-2 border-slate-200 max-h-[84dvh] overflow-y-auto shadow-2xl">
         <div className="mb-5">
           <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
             First-Time Setup
@@ -197,7 +200,8 @@ export default function InternshipSetupModal({
           </button>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

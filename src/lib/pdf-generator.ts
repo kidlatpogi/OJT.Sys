@@ -111,12 +111,33 @@ async function drawCenteredHeaderBanner(
   pdfDoc: PDFDocument,
   page: PDFPage,
   pageWidth: number,
-  topY: number
+  topY: number,
+  origin?: string
 ): Promise<number> {
-  const logoPath = path.join(process.cwd(), 'public', 'seca-header.png');
-  if (!fs.existsSync(logoPath)) return topY;
+  let logoBytes: Uint8Array | null = null;
 
-  const logoBytes = fs.readFileSync(logoPath);
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'seca-header.png');
+    if (fs.existsSync(logoPath)) {
+      logoBytes = fs.readFileSync(logoPath);
+    }
+  } catch {
+    // Fallback to HTTP fetch when running in Workers without local fs
+  }
+
+  if (!logoBytes && origin) {
+    try {
+      const res = await fetch(`${origin}/seca-header.png`);
+      if (res.ok) {
+        logoBytes = new Uint8Array(await res.arrayBuffer());
+      }
+    } catch {
+      // Ignore asset fetch failure
+    }
+  }
+
+  if (!logoBytes) return topY;
+
   const img = await pdfDoc.embedPng(logoBytes);
   const centeredX = (pageWidth - LOGO_WIDTH_PT) / 2;
   page.drawImage(img, {
@@ -160,8 +181,9 @@ export async function generateOfficialPdf(params: {
   logs: AttendanceLog[];
   monthFilter?: string;
   weekStart?: string;
+  origin?: string;
 }): Promise<Buffer> {
-  const { type, profile, logs } = params;
+  const { type, profile, logs, origin } = params;
   const pdfDoc = await PDFDocument.create();
 
   // Exact page dimensions matching each Word template (003 & 004: A4, 005: US Letter)
@@ -178,7 +200,7 @@ export async function generateOfficialPdf(params: {
 
   const sortedLogs = [...logs].sort((a, b) => a.date.localeCompare(b.date));
 
-  let y = await drawCenteredHeaderBanner(pdfDoc, page, pageWidth, startTopY);
+  let y = await drawCenteredHeaderBanner(pdfDoc, page, pageWidth, startTopY, origin);
 
   if (type === '003') {
     const title = 'DAILY ATTENDANCE REPORT';

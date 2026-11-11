@@ -575,8 +575,8 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
       {previewPdfUrl &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-xs flex flex-col p-2 sm:p-5">
-            <div className="max-w-5xl w-full mx-auto bg-white rounded-2xl sm:rounded-3xl border-2 border-slate-200 flex flex-col flex-1 overflow-hidden shadow-2xl">
+          <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="max-w-5xl w-full h-[84dvh] sm:h-[88dvh] mx-auto bg-white rounded-2xl sm:rounded-3xl border-2 border-slate-200 flex flex-col overflow-hidden shadow-2xl">
               <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-[#C44900] font-bold block">
@@ -622,11 +622,11 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
                 </div>
               </div>
 
-              <div className="flex-1 bg-slate-100 p-2 sm:p-4 overflow-auto">
+              <div className="flex-1 bg-slate-100 p-2 sm:p-4 overflow-hidden flex flex-col">
                 <iframe
                   src={previewPdfUrl}
                   title={previewTitle}
-                  className="w-full h-full min-h-[72dvh] rounded-xl border border-slate-300 bg-white"
+                  className="w-full flex-1 rounded-xl border border-slate-300 bg-white"
                 />
               </div>
             </div>

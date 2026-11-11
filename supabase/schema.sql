@@ -23,6 +23,7 @@ create table if not exists public.profiles (
   daily_end_time time not null default '18:00:00',
   lunch_break_minutes integer not null default 0,
   auto_time_out boolean not null default true,
+  document_checklist jsonb not null default '[]'::jsonb,
   academic_term text not null default 'TERM 2 AY 2025 - 2026',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -30,6 +31,7 @@ create table if not exists public.profiles (
 
 -- If upgrading an existing database, run:
 alter table public.profiles add column if not exists auto_time_out boolean not null default true;
+alter table public.profiles add column if not exists document_checklist jsonb not null default '[]'::jsonb;
 
 -- 2. ATTENDANCE LOGS TABLE (Daily Punch Clock + Tasks + AI Past-Tense Summary)
 create table if not exists public.attendance_logs (
