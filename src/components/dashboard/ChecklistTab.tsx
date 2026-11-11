@@ -11,7 +11,6 @@ interface DocumentChecklistItem {
   id: string;
   phase: ChecklistPhase;
   phaseLabel: string;
-  reference: string;
   title: string;
   description: string;
 }
@@ -22,7 +21,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'prelim-internship-agreement',
     phase: 'Preliminary',
     phaseLabel: '1. Preliminary Documents (Pre-Internship)',
-    reference: 'Items 6 & 7',
     title: 'Internship Agreement (SECA-CTNTERN-001)',
     description:
       'Fully signed by Student Intern, Parent/Guardian, Company Representative, and Internship Coordinator.',
@@ -31,7 +29,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'prelim-internship-plan',
     phase: 'Preliminary',
     phaseLabel: '1. Preliminary Documents (Pre-Internship)',
-    reference: 'Items 6 & 7',
     title: 'Internship Plan (SECA-CTNTERN-002)',
     description:
       'Filled with job role, daily schedule, tasks, and signed by Supervisor and Coordinator.',
@@ -40,7 +37,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'prelim-medical-certificate',
     phase: 'Preliminary',
     phaseLabel: '1. Preliminary Documents (Pre-Internship)',
-    reference: 'Item 8',
     title: 'Medical Certificate',
     description: 'Issued by the University Clinic.',
   },
@@ -48,7 +44,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'prelim-parent-consent',
     phase: 'Preliminary',
     phaseLabel: '1. Preliminary Documents (Pre-Internship)',
-    reference: 'Item 9',
     title: 'Parent/Guardian Consent Form',
     description: 'Signed by parent or legal guardian.',
   },
@@ -58,7 +53,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'ongoing-daily-attendance',
     phase: 'Ongoing',
     phaseLabel: '2. Ongoing Documents (Weekly & Monthly Tracking)',
-    reference: 'Item 12',
     title: 'Daily Attendance Report (SECA-CTNTERN-003)',
     description:
       'Tracked daily with Time-In, Time-Out, calculated hours, and supervisor signature.',
@@ -67,7 +61,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'ongoing-weekly-report',
     phase: 'Ongoing',
     phaseLabel: '2. Ongoing Documents (Weekly & Monthly Tracking)',
-    reference: 'Item 11',
     title: 'Weekly Activity Report / WAR (SECA-CTNTERN-004)',
     description:
       'Compiled at the start/end of each workweek and signed by Trainer/Supervisor.',
@@ -76,7 +69,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'ongoing-monthly-report',
     phase: 'Ongoing',
     phaseLabel: '2. Ongoing Documents (Weekly & Monthly Tracking)',
-    reference: 'Recurring Reports',
     title: 'Monthly Activity Report (SECA-CTNTERN-005)',
     description:
       'Summary of weekly accomplishments starting with past-tense action verbs.',
@@ -87,7 +79,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'post-supervisor-evaluation',
     phase: 'Post-Internship',
     phaseLabel: '3. Post-Internship Documents (Final Submission)',
-    reference: 'Item 13',
     title: 'Final Industry Supervisor Evaluation',
     description: 'Completed and signed by your immediate supervisor.',
   },
@@ -95,7 +86,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'post-certificate-completion',
     phase: 'Post-Internship',
     phaseLabel: '3. Post-Internship Documents (Final Submission)',
-    reference: 'Item 13',
     title: 'Certificate of Completion',
     description: 'Issued by the company upon completing required hours.',
   },
@@ -103,7 +93,6 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'post-student-evaluation',
     phase: 'Post-Internship',
     phaseLabel: '3. Post-Internship Documents (Final Submission)',
-    reference: 'Item 13',
     title: 'Student Internship Evaluation Form',
     description: 'Your feedback evaluating the company and program.',
   },
@@ -111,13 +100,17 @@ const DOCUMENT_CHECKLIST: DocumentChecklistItem[] = [
     id: 'post-internship-portfolio',
     phase: 'Post-Internship',
     phaseLabel: '3. Post-Internship Documents (Final Submission)',
-    reference: 'Item 14',
     title: 'Internship Portfolio / Narrative Report',
     description: 'Final compiled portfolio submitted to your Internship Coordinator.',
   },
 ];
 
 const VALID_IDS = new Set(DOCUMENT_CHECKLIST.map((d) => d.id));
+
+function sanitizeIdList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((id): id is string => typeof id === 'string' && VALID_IDS.has(id));
+}
 
 interface ChecklistTabProps {
   userId: string;
@@ -134,10 +127,7 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
       try {
         const localRaw = localStorage.getItem(storageKey);
         if (localRaw) {
-          const parsed = JSON.parse(localRaw);
-          if (Array.isArray(parsed)) {
-            setCheckedIds(parsed.filter((id) => VALID_IDS.has(id)));
-          }
+          setCheckedIds(sanitizeIdList(JSON.parse(localRaw)));
         }
       } catch {
         // ignore localStorage parse error
@@ -146,10 +136,26 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
       if (isSupabaseConfigured()) {
         try {
           const supabase = createClient();
+
+          // 1. Primary source: public.profiles.document_checklist in Supabase PostgreSQL
+          const { data: profData } = await supabase
+            .from('profiles')
+            .select('document_checklist')
+            .eq('id', userId)
+            .single();
+
+          if (profData && Array.isArray(profData.document_checklist)) {
+            const clean = sanitizeIdList(profData.document_checklist);
+            setCheckedIds(clean);
+            localStorage.setItem(storageKey, JSON.stringify(clean));
+            return;
+          }
+
+          // 2. Fallback: auth user_metadata if column isn't migrated yet
           const { data } = await supabase.auth.getUser();
           const metaList = data?.user?.user_metadata?.ojt_checklist;
           if (Array.isArray(metaList)) {
-            const clean = metaList.filter((id: unknown): id is string => typeof id === 'string' && VALID_IDS.has(id));
+            const clean = sanitizeIdList(metaList);
             setCheckedIds(clean);
             localStorage.setItem(storageKey, JSON.stringify(clean));
           }
@@ -159,20 +165,30 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
       }
     };
     loadChecklist();
-  }, [storageKey]);
+  }, [storageKey, userId]);
 
   const persistChecklist = async (next: string[]) => {
-    const clean = next.filter((id) => VALID_IDS.has(id));
+    const clean = sanitizeIdList(next);
     setCheckedIds(clean);
     try {
       localStorage.setItem(storageKey, JSON.stringify(clean));
     } catch {
       // ignore storage quota
     }
+
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
-        await supabase.auth.updateUser({ data: { ojt_checklist: clean } });
+        // Save to PostgreSQL profiles table (cross-device primary persistence)
+        const { error: dbErr } = await supabase
+          .from('profiles')
+          .update({ document_checklist: clean })
+          .eq('id', userId);
+
+        // Also mirror to user_metadata as fallback if SQL column hasn't been added yet
+        if (dbErr) {
+          await supabase.auth.updateUser({ data: { ojt_checklist: clean } });
+        }
       } catch {
         // ignore sync error
       }
@@ -312,12 +328,8 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <span className="inline-block font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-[#C44900]">
-                      {item.reference}
-                    </span>
-
                     <h4
-                      className={`font-clash-semibold text-base sm:text-lg font-bold mt-1.5 leading-snug ${
+                      className={`font-clash-semibold text-base sm:text-lg font-bold leading-snug ${
                         checked ? 'line-through text-slate-500' : 'text-slate-900'
                       }`}
                     >
