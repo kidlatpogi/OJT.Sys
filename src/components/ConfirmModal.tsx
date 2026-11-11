@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -55,38 +55,25 @@ export default function ConfirmModal({
         className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 border-t-2 sm:border-2 border-slate-200 shadow-2xl safe-bottom"
       >
         <div className="flex items-start justify-between gap-3">
-          <div
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
-              isDanger
-                ? 'bg-red-50 text-red-600 border border-red-200'
-                : 'bg-orange-50 text-[#C44900] border border-[#C44900]/25'
-            }`}
+          <h3
+            id="confirm-modal-title"
+            className="font-clash-semibold text-xl sm:text-2xl font-bold text-black"
           >
-            {isDanger ? (
-              <AlertTriangle className="w-5 h-5" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5" />
-            )}
-          </div>
+            {title}
+          </h3>
 
           <button
             type="button"
             disabled={loading}
             aria-label="Close confirmation"
             onClick={onCancel}
-            className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+            className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <h3
-          id="confirm-modal-title"
-          className="font-clash-semibold text-xl sm:text-2xl font-bold text-black mt-4"
-        >
-          {title}
-        </h3>
-        <p className="font-sans text-sm text-slate-600 leading-relaxed mt-1.5">
+        <p className="font-sans text-sm text-slate-600 leading-relaxed mt-2">
           {description}
         </p>
 
@@ -117,4 +104,3 @@ export default function ConfirmModal({
     document.body
   );
 }
-
