@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { Clock, FileText, ListChecks, UserCog } from 'lucide-react';
+import { ClipboardCheck, Clock, FileText, ListChecks, UserCog } from 'lucide-react';
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
 import PunchClockCard from '@/components/dashboard/PunchClockCard';
@@ -18,6 +18,9 @@ const LogsTab = dynamic(() => import('@/components/dashboard/LogsTab'), {
   loading: TabSkeleton,
 });
 const ReportsTab = dynamic(() => import('@/components/dashboard/ReportsTab'), {
+  loading: TabSkeleton,
+});
+const ChecklistTab = dynamic(() => import('@/components/dashboard/ChecklistTab'), {
   loading: TabSkeleton,
 });
 const ProfileTab = dynamic(() => import('@/components/dashboard/ProfileTab'), {
@@ -39,7 +42,7 @@ import {
 } from '@/lib/storage';
 import { formatHoursWhole, getTodayDateString } from '@/lib/ojt-calculations';
 
-type TabKey = 'clock' | 'logs' | 'reports' | 'profile';
+type TabKey = 'clock' | 'logs' | 'reports' | 'checklist' | 'profile';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -252,6 +255,7 @@ export default function DashboardPage() {
     { key: 'clock', label: 'Clock', icon: <Clock className="w-5 h-5" /> },
     { key: 'logs', label: 'Logs', icon: <ListChecks className="w-5 h-5" /> },
     { key: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
+    { key: 'checklist', label: 'Checklist', icon: <ClipboardCheck className="w-5 h-5" /> },
     { key: 'profile', label: 'Profile', icon: <UserCog className="w-5 h-5" /> },
   ];
 
@@ -341,6 +345,7 @@ export default function DashboardPage() {
               />
             )}
             {activeTab === 'reports' && <ReportsTab profile={profile} logs={logs} />}
+            {activeTab === 'checklist' && <ChecklistTab userId={profile.id} />}
             {activeTab === 'profile' && (
               <ProfileTab
                 profile={profile}
@@ -365,7 +370,7 @@ export default function DashboardPage() {
         aria-label="Mobile navigation"
         className="no-print sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 pt-2 safe-bottom"
       >
-        <div className="grid grid-cols-4 gap-1 max-w-md mx-auto">
+        <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
           {navItems.map((item) => {
             const active = activeTab === item.key;
             return (
@@ -378,7 +383,7 @@ export default function DashboardPage() {
                 }`}
               >
                 {item.icon}
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-tight">
                   {item.label}
                 </span>
               </button>

@@ -329,12 +329,14 @@ export async function POST(req: NextRequest) {
     };
 
     if (format === 'pdf') {
+      const origin = new URL(req.url).origin;
       const pdfBytes = await generateOfficialPdf({
         type,
         profile,
         logs,
         monthFilter,
         weekStart,
+        origin,
       });
 
       return new NextResponse(new Uint8Array(pdfBytes), {
@@ -345,6 +347,16 @@ export async function POST(req: NextRequest) {
           'Cache-Control': 'no-store',
         },
       });
+    }
+
+    if (!resolveTemplatePath(type)) {
+      return NextResponse.json(
+        {
+          error:
+            'Official DOCX templates are not bundled in this cloud deployment. Use PDF export or place the DOCX templates locally.',
+        },
+        { status: 404 }
+      );
     }
 
     const docxBuffer = buildFilledDocxBuffer({
