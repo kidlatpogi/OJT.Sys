@@ -29,6 +29,7 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
   const [timeOut, setTimeOut] = useState('17:00');
   const [summary, setSummary] = useState('');
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [emptySummaryModalOpen, setEmptySummaryModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceLog | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -60,6 +61,10 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!summary.trim()) {
+      setEmptySummaryModalOpen(true);
+      return;
+    }
     setConfirmSaveOpen(true);
   };
 
@@ -77,7 +82,7 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
       hours_worked: hrs,
       tasks_selected: editing?.tasks_selected || [],
       custom_tasks: editing?.custom_tasks || '',
-      ai_summary: summary,
+      ai_summary: summary.trim(),
       ai_provider: editing?.ai_provider || 'manual',
     });
     setSubmitting(false);
@@ -269,6 +274,17 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
         confirmLabel={editing ? 'Save Changes' : 'Add Log'}
         onConfirm={handleConfirmedSave}
         onCancel={() => setConfirmSaveOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={emptySummaryModalOpen}
+        variant="danger"
+        title="Daily Accomplishments Required"
+        description="Daily Accomplishments cannot be empty. Please add at least 1 thing you did before saving."
+        confirmLabel="Got It"
+        cancelLabel="Close"
+        onConfirm={() => setEmptySummaryModalOpen(false)}
+        onCancel={() => setEmptySummaryModalOpen(false)}
       />
 
       <ConfirmModal
