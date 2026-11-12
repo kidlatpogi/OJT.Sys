@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OJT.SYS</string>
+    <string name="title_activity_main">OJT.SYS</string>
+    <string name="package_name">com.ojtsys.app</string>
+    <string name="custom_url_scheme">com.ojtsys.app</string>
+</resources>

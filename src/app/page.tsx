@@ -4,9 +4,11 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Download,
   FileCheck2,
   FileSpreadsheet,
   FileText,
+  Smartphone,
 } from 'lucide-react';
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
@@ -83,6 +85,14 @@ export default function LandingPage() {
               Create Trainee Account
               <ArrowRight className="w-4 h-4 text-[#C44900]" />
             </Link>
+            <a
+              href="/downloads/ojt-sys.apk"
+              download="ojt-sys.apk"
+              className="h-12 px-6 rounded-2xl bg-[#141313] hover:bg-slate-800 text-white font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4 text-[#C44900]" />
+              Download Android App
+            </a>
           </div>
         </div>
 
@@ -168,6 +178,42 @@ export default function LandingPage() {
                 );
               })}
             </div>
+          </div>
+        </section>
+
+        {/* Dedicated Android Mobile App Download Section */}
+        <section
+          id="android-download"
+          className="mt-8 border-2 border-slate-200/80 bg-white rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm"
+        >
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#C44900] font-mono text-[11px] font-bold uppercase tracking-wider">
+              <Smartphone className="w-3.5 h-3.5" />
+              Android App • Capacitor
+            </div>
+            <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-3">
+              Install OJT.SYS on Your Android Device
+            </h2>
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+              Get the dedicated Android APK for quick home-screen access to your daily Time-In/Time-Out punch clock, engineering task checklist, and 1:1 report exports.
+            </p>
+            <p className="font-mono text-[11px] text-slate-400 mt-2.5">
+              Direct APK package • Allow &ldquo;Install unknown apps&rdquo; if prompted by Android.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row md:flex-col items-stretch sm:items-center md:items-end gap-2.5 shrink-0">
+            <a
+              href="/downloads/ojt-sys.apk"
+              download="ojt-sys.apk"
+              className="h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2.5 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
+            >
+              <Download className="w-4 h-4" />
+              Download for Android (.apk)
+            </a>
+            <span className="font-mono text-[11px] text-slate-500 text-center md:text-right">
+              v1.0.0 • Android 7.0+ (APK)
+            </span>
           </div>
         </section>
       </main>
