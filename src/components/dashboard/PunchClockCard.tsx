@@ -48,9 +48,10 @@ export default function PunchClockCard({
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; variant: 'success' | 'error' } | null>(null);
   const [autoTimeOutBlocked, setAutoTimeOutBlocked] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'time-in' | 'time-out' | 'save-log' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'time-in' | 'time-out' | 'save-log' | 'format-notes' | null>(null);
 
   const autoTimeOutTriggeredRef = useRef(false);
+  const justTimedOutRef = useRef(false);
 
   useEffect(() => {
     setNow(new Date());
@@ -60,6 +61,17 @@ export default function PunchClockCard({
 
   useEffect(() => {
     if (todayLog) {
+      if (justTimedOutRef.current && todayLog.time_out) {
+        justTimedOutRef.current = false;
+        setSelectedTasks([]);
+        setCustomTasks('');
+        setAiSummary('');
+        setAiProvider('manual');
+        setTasksDirty(false);
+        autoTimeOutTriggeredRef.current = true;
+        setAutoTimeOutBlocked(false);
+        return;
+      }
       setSelectedTasks(todayLog.tasks_selected || []);
       setCustomTasks(todayLog.custom_tasks || '');
       setAiSummary(todayLog.ai_summary || '');
@@ -88,8 +100,10 @@ export default function PunchClockCard({
   const todayStr = getTodayDateString();
   const isTimedIn = Boolean(todayLog?.time_in);
   const isTimedOut = Boolean(todayLog?.time_out);
+  const isChecklistLocked = !isTimedIn || isTimedOut;
 
   const toggleTask = (label: string) => {
+    if (isChecklistLocked) return;
     setTasksDirty(true);
     setSelectedTasks((prev) =>
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -132,38 +146,54 @@ export default function PunchClockCard({
     async (outTimestampIso: string, reason: 'manual' | 'auto') => {
       if (!todayLog?.time_in) return;
       setIsSaving(true);
-      const hours = calculateShiftHours(
-        todayLog.time_in,
-        outTimestampIso,
-        profile.lunch_break_minutes
-      );
-      const polished = await getAutoPolishedOutput();
-
-      await onSaveLog({
-        id: todayLog.id,
-        date: todayStr,
-        time_in: todayLog.time_in,
-        time_out: outTimestampIso,
-        hours_worked: hours,
-        tasks_selected: selectedTasks,
-        custom_tasks: customTasks,
-        ai_summary: polished.summary,
-        ai_provider: polished.provider,
-      });
-
-      setIsSaving(false);
-      setAutoTimeOutBlocked(false);
-
-      if (reason === 'auto') {
-        showToast(
-          `Shift finished! Auto timed out at ${formatTimeDisplay(outTimestampIso)} (${formatHoursWhole(hours)}).`,
-          'success'
+      try {
+        const hours = calculateShiftHours(
+          todayLog.time_in,
+          outTimestampIso,
+          profile.lunch_break_minutes
         );
-      } else {
-        showToast(
-          `Timed Out! Logged ${formatHoursWhole(hours)} and formatted for your reports.`,
-          'success'
-        );
+        const polished = await getAutoPolishedOutput();
+
+        justTimedOutRef.current = true;
+
+        await onSaveLog({
+          id: todayLog.id,
+          date: todayStr,
+          time_in: todayLog.time_in,
+          time_out: outTimestampIso,
+          hours_worked: hours,
+          tasks_selected: selectedTasks,
+          custom_tasks: customTasks,
+          ai_summary: polished.summary,
+          ai_provider: polished.provider,
+        });
+
+        setAutoTimeOutBlocked(false);
+        setSelectedTasks([]);
+        setCustomTasks('');
+        setAiSummary('');
+        setAiProvider('manual');
+        setTasksDirty(false);
+
+        if (reason === 'auto') {
+          showToast(
+            `Shift finished! Auto timed out at ${formatTimeDisplay(outTimestampIso)} (${formatHoursWhole(hours)}).`,
+            'success'
+          );
+        } else {
+          showToast(
+            `Timed Out! Logged ${formatHoursWhole(hours)} and formatted for your reports.`,
+            'success'
+          );
+        }
+      } catch {
+        justTimedOutRef.current = false;
+        if (reason === 'auto') {
+          autoTimeOutTriggeredRef.current = false;
+        }
+        showToast('Failed to save time-out. Please try again.', 'error');
+      } finally {
+        setIsSaving(false);
       }
     },
     [
@@ -188,6 +218,13 @@ export default function PunchClockCard({
     const shiftEnd = getTodayShiftEndDate(profile.daily_end_time || '18:00');
     if (!shiftEnd) return;
 
+    // Never auto time-out to a shift end that is earlier than or equal to the actual Time-In
+    const timeInMs = todayLog?.time_in ? new Date(todayLog.time_in).getTime() : NaN;
+    if (Number.isNaN(timeInMs) || timeInMs >= shiftEnd.getTime()) {
+      setAutoTimeOutBlocked(false);
+      return;
+    }
+
     if (now.getTime() >= shiftEnd.getTime()) {
       // Restriction 5a: Do NOT auto time-out if none of "What did you work on?" is checked
       if (selectedTasks.length === 0) {
@@ -205,6 +242,7 @@ export default function PunchClockCard({
     now,
     profile.auto_time_out,
     profile.daily_end_time,
+    todayLog?.time_in,
     isTimedIn,
     isTimedOut,
     isSaving,
@@ -243,6 +281,20 @@ export default function PunchClockCard({
     setPendingAction('time-out');
   };
 
+  const handleFormatCustomNotes = async () => {
+    if (!customTasks.trim()) return;
+    setIsSaving(true);
+    try {
+      const generated = await runAutoPolish(selectedTasks, customTasks);
+      setAiSummary(generated.summary);
+      setAiProvider(generated.provider);
+      setTasksDirty(false);
+      showToast('Custom notes formatted into Weekly & Monthly Report Summary.', 'success');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleConfirmPendingAction = async () => {
     const action = pendingAction;
     if (!action) return;
@@ -252,6 +304,8 @@ export default function PunchClockCard({
       await executeTimeOut(new Date().toISOString(), 'manual');
     } else if (action === 'save-log') {
       await handleSaveTasks();
+    } else if (action === 'format-notes') {
+      await handleFormatCustomNotes();
     }
     setPendingAction(null);
   };
@@ -416,91 +470,123 @@ export default function PunchClockCard({
           <Clock className="w-5 h-5 text-[#C44900] shrink-0" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {PRESET_OJT_TASKS.map((task) => {
-            const active = selectedTasks.includes(task.label);
-            return (
-              <button
-                key={task.id}
-                type="button"
-                onClick={() => toggleTask(task.label)}
-                className={`min-h-[48px] px-3.5 py-2.5 rounded-2xl border-2 text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
-                  active
-                    ? 'border-[#C44900] bg-[#C44900]/8 text-slate-900'
-                    : 'border-slate-200/90 bg-slate-50/50 text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <span className="block font-sans text-sm font-semibold leading-snug">
-                    {task.label}
-                  </span>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    {task.category}
-                  </span>
-                </div>
-                <span
-                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                    active ? 'bg-[#C44900] text-white' : 'bg-white border border-slate-300'
+        {isChecklistLocked && (
+          <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-[#C44900] shrink-0 mt-0.5" />
+            <div className="font-mono text-xs leading-relaxed">
+              <p className="font-bold text-slate-900">
+                {!isTimedIn ? 'Not Timed In Yet' : 'Shift Finished — Already Clocked Out'}
+              </p>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                {!isTimedIn
+                  ? 'Tap "Tap to Time-In" above to unlock the task checklist, custom notes, and report summary.'
+                  : 'Your shift is complete and your accomplishments have been saved to Daily Logs.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className={`space-y-4 transition-opacity ${isChecklistLocked ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {PRESET_OJT_TASKS.map((task) => {
+              const active = selectedTasks.includes(task.label);
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  disabled={isChecklistLocked}
+                  onClick={() => toggleTask(task.label)}
+                  className={`min-h-[48px] px-3.5 py-2.5 rounded-2xl border-2 text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                    active
+                      ? 'border-[#C44900] bg-[#C44900]/8 text-slate-900'
+                      : 'border-slate-200/90 bg-slate-50/50 text-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  {active && <Check className="w-3.5 h-3.5" />}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div>
-          <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">
-            Others / Custom Notes
-          </label>
-          <textarea
-            rows={2}
-            value={customTasks}
-            onChange={(e) => {
-              setTasksDirty(true);
-              setCustomTasks(e.target.value);
-            }}
-            placeholder="e.g. Fix login redirect bug on iOS Safari; migrate users table"
-            className="w-full p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none text-sm text-slate-900"
-          />
-        </div>
-
-        {/* Auto-Formatted Summary Preview for Weekly Report & Monthly Report */}
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-[#C44900]" />
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
-                Weekly Report &amp; Monthly Report Summary
-              </span>
-            </div>
-            <span className="font-mono text-[10px] text-slate-400 uppercase">
-              Auto-formatted on save
-            </span>
+                  <div>
+                    <span className="block font-sans text-sm font-semibold leading-snug">
+                      {task.label}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                      {task.category}
+                    </span>
+                  </div>
+                  <span
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                      active ? 'bg-[#C44900] text-white' : 'bg-white border border-slate-300'
+                    }`}
+                  >
+                    {active && <Check className="w-3.5 h-3.5" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          <textarea
-            rows={4}
-            value={aiSummary}
-            onChange={(e) => {
-              setTasksDirty(false);
-              setAiSummary(e.target.value);
-            }}
-            placeholder="Automatically generated in past tense when you save or time-out..."
-            className="w-full p-3 rounded-xl border border-slate-200 bg-white focus:border-[#C44900] focus:outline-none text-sm text-slate-800 leading-relaxed"
-          />
-        </div>
+          <div className="space-y-2">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+              Others / Custom Notes
+            </label>
+            <textarea
+              rows={2}
+              disabled={isChecklistLocked}
+              value={customTasks}
+              onChange={(e) => {
+                setTasksDirty(true);
+                setCustomTasks(e.target.value);
+              }}
+              placeholder="e.g. Fix login redirect bug on iOS Safari; migrate users table"
+              className="w-full p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none text-sm text-slate-900 disabled:cursor-not-allowed"
+            />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={isChecklistLocked || isSaving || !customTasks.trim()}
+                onClick={() => setPendingAction('format-notes')}
+                className="h-10 px-4 rounded-xl border-2 border-slate-200 bg-white hover:border-[#C44900] hover:text-[#C44900] disabled:opacity-50 disabled:cursor-not-allowed text-slate-800 font-mono text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#C44900]" />
+                Add Notes to Summary
+              </button>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => setPendingAction('save-log')}
-          className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-        >
-          <Save className="w-4 h-4" />
-          {isSaving ? 'Saving & Formatting...' : 'Save Today’s Log'}
-        </button>
+          {/* Auto-Formatted Summary Preview for Weekly Report & Monthly Report */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#C44900]" />
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Weekly Report &amp; Monthly Report Summary
+                </span>
+              </div>
+              <span className="font-mono text-[10px] text-slate-400 uppercase">
+                Auto-formatted on save
+              </span>
+            </div>
+
+            <textarea
+              rows={4}
+              disabled={isChecklistLocked}
+              value={aiSummary}
+              onChange={(e) => {
+                setTasksDirty(false);
+                setAiSummary(e.target.value);
+              }}
+              placeholder="Automatically generated in past tense when you save or time-out..."
+              className="w-full p-3 rounded-xl border border-slate-200 bg-white focus:border-[#C44900] focus:outline-none text-sm text-slate-800 leading-relaxed disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <button
+            type="button"
+            disabled={isChecklistLocked || isSaving}
+            onClick={() => setPendingAction('save-log')}
+            className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 disabled:cursor-not-allowed text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            {isSaving ? 'Saving & Formatting...' : 'Save Today’s Log'}
+          </button>
+        </div>
       </section>
 
       <ConfirmModal
@@ -511,6 +597,8 @@ export default function PunchClockCard({
             ? 'Confirm Time-In'
             : pendingAction === 'time-out'
             ? 'Confirm Time-Out'
+            : pendingAction === 'format-notes'
+            ? 'Add Notes to Summary'
             : "Save Today's Log"
         }
         description={
@@ -518,6 +606,8 @@ export default function PunchClockCard({
             ? `Record your Time-In for ${liveDateStr} at ${liveTimeStr}?`
             : pendingAction === 'time-out'
             ? `Complete your shift and record Time-Out at ${liveTimeStr}? Your selected tasks will be formatted automatically for your reports.`
+            : pendingAction === 'format-notes'
+            ? 'Format your custom notes (along with any checked tasks) into past-tense statements for the Weekly & Monthly Report Summary?'
             : "Save today's checked tasks and accomplishment summary to your attendance log?"
         }
         confirmLabel={
@@ -525,6 +615,8 @@ export default function PunchClockCard({
             ? 'Time In'
             : pendingAction === 'time-out'
             ? 'Time Out'
+            : pendingAction === 'format-notes'
+            ? 'Add to Summary'
             : 'Save Log'
         }
         onConfirm={handleConfirmPendingAction}

@@ -123,7 +123,7 @@ export default function DashboardPage() {
   }, [router, supabaseReady]);
 
   const totalHoursServed = useMemo(
-    () => logs.reduce((acc, item) => acc + Math.ceil(Number(item.hours_worked) || 0), 0),
+    () => logs.reduce((acc, item) => acc + Math.round(Number(item.hours_worked) || 0), 0),
     [logs]
   );
 
@@ -329,13 +329,13 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {activeTab === 'clock' && (
+            <div className={activeTab === 'clock' ? 'block' : 'hidden'}>
               <PunchClockCard
                 profile={profile}
                 todayLog={todayLog}
                 onSaveLog={handleSaveLog}
               />
-            )}
+            </div>
             {activeTab === 'logs' && (
               <LogsTab
                 profile={profile}
