@@ -70,28 +70,28 @@ export default function LandingPage() {
           </p>
 
           {/* Mobile-First Thumb-Friendly CTA Group */}
-          <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md sm:max-w-[460px]">
             <Link
               href="/dashboard"
-              className="h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
+              className="h-12 px-5 sm:px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
             >
-              <Clock className="w-4 h-4" />
+              <Clock className="w-4 h-4 shrink-0" />
               Open OJT Workspace
             </Link>
             <Link
               href="/register"
-              className="h-12 px-6 rounded-2xl bg-white hover:border-[#C44900] border-2 border-slate-200/90 text-slate-900 font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2 transition-all"
+              className="h-12 px-5 sm:px-6 rounded-2xl bg-white hover:border-[#C44900] border-2 border-slate-200/90 text-slate-900 font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2 transition-all"
             >
               Create Trainee Account
-              <ArrowRight className="w-4 h-4 text-[#C44900]" />
+              <ArrowRight className="w-4 h-4 text-[#C44900] shrink-0" />
             </Link>
             <a
               href="/downloads/ojt-sys.apk"
               download="ojt-sys.apk"
-              className="h-12 px-6 rounded-2xl bg-[#141313] hover:bg-slate-800 text-white font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+              className="sm:col-span-2 h-12 px-6 rounded-2xl bg-[#141313] hover:bg-slate-800 text-white font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2 transition-all shadow-sm"
             >
-              <Download className="w-4 h-4 text-[#C44900]" />
-              Download Android App
+              <Download className="w-4 h-4 text-[#C44900] shrink-0" />
+              Download Android App (.apk)
             </a>
           </div>
         </div>
@@ -206,9 +206,9 @@ export default function LandingPage() {
             <a
               href="/downloads/ojt-sys.apk"
               download="ojt-sys.apk"
-              className="h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base tracking-tight inline-flex items-center justify-center gap-2.5 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
+              className="h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2.5 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 shrink-0" />
               Download for Android (.apk)
             </a>
             <span className="font-mono text-[11px] text-slate-500 text-center md:text-right">

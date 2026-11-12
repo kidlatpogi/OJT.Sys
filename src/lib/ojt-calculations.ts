@@ -20,11 +20,12 @@ export function calculateShiftHours(
   const netMinutes = Math.max(0, grossMinutes - deduction);
   if (netMinutes === 0) return 0;
 
-  return Math.ceil(netMinutes / 60);
+  // Round to nearest whole hour (no decimals) so brief tests like 2m record as 0h
+  return Math.round(netMinutes / 60);
 }
 
 export function formatHoursWhole(hours: number): string {
-  const rounded = Math.ceil(Math.max(0, Number(hours) || 0));
+  const rounded = Math.round(Math.max(0, Number(hours) || 0));
   return `${rounded}h`;
 }
 

@@ -1,17 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Roboto_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800', '900'],
+const inter = localFont({
+  src: '../../public/fonts/Inter-Variable.woff2',
+  weight: '100 900',
   variable: '--font-inter',
   display: 'swap',
 });
 
-const robotoMono = Roboto_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const robotoMono = localFont({
+  src: '../../public/fonts/RobotoMono-Variable.woff2',
+  weight: '100 700',
   variable: '--font-roboto-mono',
   display: 'swap',
 });

@@ -118,7 +118,7 @@
         <input
           id="server-url"
           type="url"
-          placeholder="https://ojt-sys.workers.dev"
+          placeholder="https://ojt-sys.kidlat.workers.dev"
           required
         />
         <button type="submit">Open OJT.SYS</button>
@@ -143,7 +143,7 @@
             var url = (input.value || "").trim().replace(/\/+$/, "");
             if (!url) return;
             localStorage.setItem(STORAGE_KEY, url);
-            window.location.href = url;
+            window.location.href = url + "/dashboard";
           });
       })();
     </script>
