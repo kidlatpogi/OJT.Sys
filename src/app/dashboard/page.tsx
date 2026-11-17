@@ -3,7 +3,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { ClipboardCheck, Clock, FileText, ListChecks, UserCog } from 'lucide-react';
+import {
+  CalendarDays,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  ListChecks,
+  UserCog,
+} from 'lucide-react';
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
 import PunchClockCard from '@/components/dashboard/PunchClockCard';
@@ -14,6 +21,9 @@ const TabSkeleton = () => (
   </div>
 );
 
+const CalendarTab = dynamic(() => import('@/components/dashboard/CalendarTab'), {
+  loading: TabSkeleton,
+});
 const LogsTab = dynamic(() => import('@/components/dashboard/LogsTab'), {
   loading: TabSkeleton,
 });
@@ -42,7 +52,7 @@ import {
 } from '@/lib/storage';
 import { formatHoursWhole, getTodayDateString } from '@/lib/ojt-calculations';
 
-type TabKey = 'clock' | 'logs' | 'reports' | 'checklist' | 'profile';
+type TabKey = 'clock' | 'calendar' | 'logs' | 'reports' | 'checklist' | 'profile';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -253,6 +263,7 @@ export default function DashboardPage() {
 
   const navItems: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: 'clock', label: 'Clock', icon: <Clock className="w-5 h-5" /> },
+    { key: 'calendar', label: 'Calendar', icon: <CalendarDays className="w-5 h-5" /> },
     { key: 'logs', label: 'Logs', icon: <ListChecks className="w-5 h-5" /> },
     { key: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
     { key: 'checklist', label: 'Checklist', icon: <ClipboardCheck className="w-5 h-5" /> },
@@ -336,6 +347,14 @@ export default function DashboardPage() {
                 onSaveLog={handleSaveLog}
               />
             </div>
+            {activeTab === 'calendar' && (
+              <CalendarTab
+                profile={profile}
+                logs={logs}
+                onSaveLog={handleSaveLog}
+                mode={mode}
+              />
+            )}
             {activeTab === 'logs' && (
               <LogsTab
                 profile={profile}
@@ -368,9 +387,9 @@ export default function DashboardPage() {
       {/* Mobile Sticky Bottom Tab Bar */}
       <nav
         aria-label="Mobile navigation"
-        className="no-print sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 pt-2 safe-bottom"
+        className="no-print sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1.5 pt-2 pb-1 safe-bottom"
       >
-        <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
+        <div className="grid grid-cols-6 gap-0.5 max-w-lg mx-auto">
           {navItems.map((item) => {
             const active = activeTab === item.key;
             return (
@@ -378,12 +397,12 @@ export default function DashboardPage() {
                 key={item.key}
                 type="button"
                 onClick={() => setActiveTab(item.key)}
-                className={`py-2 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
+                className={`py-1.5 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
                   active ? 'text-[#C44900] bg-[#C44900]/8' : 'text-slate-500'
                 }`}
               >
                 {item.icon}
-                <span className="font-mono text-[9.5px] font-bold uppercase tracking-tight">
+                <span className="font-mono text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-tight truncate max-w-full">
                   {item.label}
                 </span>
               </button>

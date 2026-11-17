@@ -42,6 +42,16 @@ export interface WeeklySummary {
   total_weekly_hours: number;
 }
 
+export interface CalendarEntry {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  image_url: string;
+  description: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const PRESET_OJT_TASKS: { id: string; label: string; category: string }[] = [
   { id: 'frontend_ui', label: 'Frontend UI Implementation', category: 'Engineering' },
   { id: 'api_integration', label: 'API Integration & Endpoints', category: 'Engineering' },
