@@ -251,7 +251,7 @@ export default function CalendarTab({
                   <>
                     <img
                       src={entry.image_url}
-                      alt={`Photo for ${cell.date}`}
+                      alt={entry.title || `Photo for ${cell.date}`}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     {/* Contrast Gradient Overlay */}

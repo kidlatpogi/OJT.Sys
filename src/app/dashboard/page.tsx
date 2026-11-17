@@ -39,8 +39,9 @@ const ProfileTab = dynamic(() => import('@/components/dashboard/ProfileTab'), {
 const InternshipSetupModal = dynamic(
   () => import('@/components/dashboard/InternshipSetupModal')
 );
-import { AttendanceLog, UserProfile } from '@/types/ojt';
+import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+import { fetchCalendarEntries } from '@/lib/calendar-service';
 import {
   DEFAULT_DEMO_PROFILE,
   getDemoSession,
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('clock');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_DEMO_PROFILE);
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'supabase' | 'demo'>('demo');
 
@@ -106,13 +108,17 @@ export default function DashboardPage() {
           });
         }
 
-        const { data: logData } = await supabase
-          .from('attendance_logs')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false });
+        const [logRes, calData] = await Promise.all([
+          supabase
+            .from('attendance_logs')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('date', { ascending: false }),
+          fetchCalendarEntries(user.id),
+        ]);
 
-        setLogs((logData as AttendanceLog[]) || []);
+        setLogs((logRes.data as AttendanceLog[]) || []);
+        setCalendarEntries(calData || []);
         setLoading(false);
         return;
       }
@@ -124,7 +130,12 @@ export default function DashboardPage() {
         loadedProf.email = session.email;
       }
       setProfile(loadedProf);
-      setLogs(loadDemoLogs());
+      const [demoLogsData, demoCalData] = await Promise.all([
+        Promise.resolve(loadDemoLogs()),
+        fetchCalendarEntries(loadedProf.id),
+      ]);
+      setLogs(demoLogsData);
+      setCalendarEntries(demoCalData || []);
       setMode('demo');
       setLoading(false);
     };
@@ -177,6 +188,9 @@ export default function DashboardPage() {
           const filtered = prev.filter((l) => l.date !== data.date);
           return [data as AttendanceLog, ...filtered];
         });
+        if (profile.id) {
+          fetchCalendarEntries(profile.id).then(setCalendarEntries);
+        }
       }
       return;
     }
@@ -200,6 +214,9 @@ export default function DashboardPage() {
       saveDemoLogs(updated);
       return updated;
     });
+    if (profile.id) {
+      fetchCalendarEntries(profile.id).then(setCalendarEntries);
+    }
   };
 
   const handleDeleteLog = async (id: string) => {
@@ -359,6 +376,7 @@ export default function DashboardPage() {
               <LogsTab
                 profile={profile}
                 logs={logs}
+                calendarEntries={calendarEntries}
                 onSaveLog={handleSaveLog}
                 onDeleteLog={handleDeleteLog}
               />

@@ -249,6 +249,7 @@ create table if not exists public.calendar_entries (
   user_id uuid not null references auth.users (id) on delete cascade,
   date date not null,
   image_url text not null,
+  title text not null default 'What did you work on?',
   description text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

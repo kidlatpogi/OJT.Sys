@@ -47,6 +47,7 @@ export interface CalendarEntry {
   user_id: string;
   date: string; // YYYY-MM-DD
   image_url: string;
+  title?: string;
   description: string;
   created_at?: string;
   updated_at?: string;

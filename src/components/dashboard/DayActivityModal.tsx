@@ -43,6 +43,7 @@ export default function DayActivityModal({
 }: DayActivityModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [title, setTitle] = useState(initialEntry?.title || 'What did you work on?');
   const [description, setDescription] = useState(initialEntry?.description || '');
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -57,11 +58,16 @@ export default function DayActivityModal({
     if (isOpen) {
       setSelectedFile(null);
       setPreviewUrl(null);
-      setDescription(initialEntry?.description || '');
+      const initialDesc =
+        initialEntry?.description !== undefined && initialEntry?.description !== ''
+          ? initialEntry.description
+          : dayLog?.ai_summary || dayLog?.custom_tasks || '';
+      setDescription(initialDesc);
+      setTitle(initialEntry?.title || 'What did you work on?');
       setErrorMessage(null);
       setSuccessMessage(null);
     }
-  }, [isOpen, date, initialEntry]);
+  }, [isOpen, date, initialEntry, dayLog]);
 
   // Handle escape key and body scroll lock
   useEffect(() => {
@@ -153,7 +159,7 @@ export default function DayActivityModal({
         return;
       }
 
-      const saved = await saveCalendarEntry(userId, date, finalImageUrl, description);
+      const saved = await saveCalendarEntry(userId, date, finalImageUrl, description, title);
       onEntryUpdated(saved);
       setSuccessMessage('Photo saved successfully!');
       setTimeout(() => {
@@ -206,7 +212,7 @@ export default function DayActivityModal({
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#C44900] font-bold">
               <CalendarDays className="w-3.5 h-3.5" />
-              Daily Memory
+              What did you work on?
             </span>
             <h3
               id="day-modal-title"
@@ -313,6 +319,25 @@ export default function DayActivityModal({
             />
           </div>
 
+          {/* Entry Title */}
+          <div>
+            <label
+              htmlFor="day-title-input"
+              className="block font-mono text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-2"
+            >
+              Entry Title
+            </label>
+            <input
+              id="day-title-input"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What did you work on?"
+              maxLength={100}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c1c1f] border border-slate-800 focus:border-[#C44900] focus:ring-1 focus:ring-[#C44900] text-sm text-white placeholder-slate-500 font-sans outline-hidden transition-colors"
+            />
+          </div>
+
           {/* Optional Caption / Description */}
           <div>
             <label
@@ -380,7 +405,10 @@ export default function DayActivityModal({
               Close
             </button>
 
-            {(selectedFile || (initialEntry && description !== (initialEntry.description || ''))) && (
+            {(selectedFile ||
+              (initialEntry &&
+                (description !== (initialEntry.description || '') ||
+                  title !== (initialEntry.title || 'What did you work on?')))) && (
               <button
                 type="button"
                 disabled={isUploading || isDeleting}

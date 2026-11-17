@@ -97,6 +97,39 @@ export async function fetchCalendarEntries(userId: string): Promise<CalendarEntr
 }
 
 /**
+ * Fetch a single calendar entry by user ID and date (YYYY-MM-DD).
+ */
+export async function fetchCalendarEntryByDate(
+  userId: string,
+  date: string
+): Promise<CalendarEntry | null> {
+  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('calendar_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching calendar entry by date:', error);
+        return null;
+      }
+      return (data as CalendarEntry) || null;
+    } catch (err) {
+      console.error('Unexpected error fetching calendar entry by date:', err);
+      return null;
+    }
+  }
+
+  // Demo mode fallback
+  const entries = await fetchCalendarEntries(userId);
+  return entries.find((e) => e.date === date) || null;
+}
+
+/**
  * Upload calendar activity image to Supabase Storage bucket 'calendar-images'.
  * Falls back to base64 Data URL in demo mode.
  */
@@ -144,9 +177,11 @@ export async function saveCalendarEntry(
   userId: string,
   date: string,
   imageUrl: string,
-  description = ''
+  description = '',
+  title = 'What did you work on?'
 ): Promise<CalendarEntry> {
   const trimmedDesc = description.trim();
+  const trimmedTitle = title.trim() || 'What did you work on?';
 
   if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
     const supabase = createClient();
@@ -154,6 +189,7 @@ export async function saveCalendarEntry(
       user_id: userId,
       date,
       image_url: imageUrl,
+      title: trimmedTitle,
       description: trimmedDesc,
     };
 
@@ -177,6 +213,7 @@ export async function saveCalendarEntry(
     user_id: userId,
     date,
     image_url: imageUrl,
+    title: trimmedTitle,
     description: trimmedDesc,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
