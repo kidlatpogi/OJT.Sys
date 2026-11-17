@@ -244,6 +244,20 @@ export async function deleteCalendarEntry(
   if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
     const supabase = createClient();
 
+    let fileUrlToDelete = imageUrl;
+    if (!fileUrlToDelete) {
+      try {
+        const { data } = await supabase
+          .from('calendar_entries')
+          .select('image_url')
+          .match({ user_id: userId, date })
+          .maybeSingle();
+        fileUrlToDelete = data?.image_url;
+      } catch (e) {
+        console.warn('Could not query calendar_entries image_url prior to deletion:', e);
+      }
+    }
+
     // 1. Delete database row
     const { error: dbError } = await supabase
       .from('calendar_entries')
@@ -255,9 +269,9 @@ export async function deleteCalendarEntry(
     }
 
     // 2. Delete storage file if path matches our bucket
-    if (imageUrl && imageUrl.includes(`/${CALENDAR_STORAGE_BUCKET}/`)) {
+    if (fileUrlToDelete && fileUrlToDelete.includes(`/${CALENDAR_STORAGE_BUCKET}/`)) {
       try {
-        const parts = imageUrl.split(`/${CALENDAR_STORAGE_BUCKET}/`);
+        const parts = fileUrlToDelete.split(`/${CALENDAR_STORAGE_BUCKET}/`);
         if (parts[1]) {
           const objectPath = parts[1].split('?')[0];
           await supabase.storage.from(CALENDAR_STORAGE_BUCKET).remove([objectPath]);

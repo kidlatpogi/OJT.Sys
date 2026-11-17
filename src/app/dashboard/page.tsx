@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
@@ -41,7 +41,7 @@ const InternshipSetupModal = dynamic(
 );
 import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
-import { fetchCalendarEntries } from '@/lib/calendar-service';
+import { deleteCalendarEntry, fetchCalendarEntries } from '@/lib/calendar-service';
 import {
   DEFAULT_DEMO_PROFILE,
   getDemoSession,
@@ -160,6 +160,16 @@ export default function DashboardPage() {
 
   const needsOnboarding = !loading && !profile.company_name?.trim();
 
+  const refreshCalendarEntries = useCallback(async () => {
+    if (!profile.id) return;
+    try {
+      const data = await fetchCalendarEntries(profile.id);
+      setCalendarEntries(data || []);
+    } catch (e) {
+      console.error('Failed to refresh calendar entries:', e);
+    }
+  }, [profile.id]);
+
   const handleSaveLog = async (
     payload: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }
   ) => {
@@ -188,9 +198,7 @@ export default function DashboardPage() {
           const filtered = prev.filter((l) => l.date !== data.date);
           return [data as AttendanceLog, ...filtered];
         });
-        if (profile.id) {
-          fetchCalendarEntries(profile.id).then(setCalendarEntries);
-        }
+        refreshCalendarEntries();
       }
       return;
     }
@@ -214,12 +222,21 @@ export default function DashboardPage() {
       saveDemoLogs(updated);
       return updated;
     });
-    if (profile.id) {
-      fetchCalendarEntries(profile.id).then(setCalendarEntries);
-    }
+    refreshCalendarEntries();
   };
 
   const handleDeleteLog = async (id: string) => {
+    const targetLog = logs.find((l) => l.id === id);
+    if (targetLog && profile.id) {
+      const calEntry = calendarEntries.find((e) => e.date === targetLog.date);
+      try {
+        await deleteCalendarEntry(profile.id, targetLog.date, calEntry?.image_url);
+        setCalendarEntries((prev) => prev.filter((e) => e.date !== targetLog.date));
+      } catch (calErr) {
+        console.error('Failed to delete calendar entry on log deletion:', calErr);
+      }
+    }
+
     if (mode === 'supabase') {
       const supabase = createClient();
       await supabase.from('attendance_logs').delete().eq('id', id);
@@ -362,6 +379,7 @@ export default function DashboardPage() {
                 profile={profile}
                 todayLog={todayLog}
                 onSaveLog={handleSaveLog}
+                onCalendarUpdated={refreshCalendarEntries}
               />
             </div>
             {activeTab === 'calendar' && (

@@ -50,19 +50,23 @@ export default function LogsTab({
   } | null>(null);
 
   useEffect(() => {
-    if (calendarEntries) {
+    if (calendarEntries && calendarEntries.length > 0) {
       setEntries(calendarEntries);
-      return;
     }
+  }, [calendarEntries]);
+
+  useEffect(() => {
     if (!profile.id) return;
     let active = true;
     fetchCalendarEntries(profile.id).then((data) => {
-      if (active) setEntries(data);
+      if (active && data) {
+        setEntries(data);
+      }
     });
     return () => {
       active = false;
     };
-  }, [calendarEntries, profile.id, logs]);
+  }, [profile.id, logs, calendarEntries]);
 
   const calendarMap = useMemo(() => {
     const map = new Map<string, CalendarEntry>();
@@ -295,10 +299,10 @@ export default function LogsTab({
       {isModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <div className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-200 max-h-[84dvh] overflow-y-auto shadow-2xl">
+          <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto shadow-2xl my-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-clash-semibold text-xl font-bold text-black">
+                <h3 className="font-clash-semibold text-lg sm:text-xl font-bold text-black">
                   {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
                 </h3>
                 <button
@@ -351,6 +355,22 @@ export default function LogsTab({
                   </div>
                 </div>
 
+                {/* Day Photo Preview if attached in Calendar */}
+                {calendarMap.get(date)?.image_url && (
+                  <div className="space-y-1.5">
+                    <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+                      Day Photo (Calendar Entry)
+                    </label>
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 aspect-[16/9] max-h-40 bg-slate-900 flex items-center justify-center">
+                      <img
+                        src={calendarMap.get(date)!.image_url}
+                        alt={`Photo for ${date}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
                     Daily Accomplishments (Past Tense)
@@ -366,7 +386,7 @@ export default function LogsTab({
 
                 <button
                   type="submit"
-                  className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base cursor-pointer"
+                  className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base cursor-pointer shadow-sm active:scale-[0.99] transition-all"
                 >
                   Save Attendance Log
                 </button>

@@ -195,7 +195,7 @@ export default function DayActivityModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={() => {
         if (!isUploading && !isDeleting) onClose();
       }}
@@ -205,7 +205,7 @@ export default function DayActivityModal({
         aria-modal="true"
         aria-labelledby="day-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-[#141313] text-white rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden"
+        className="w-full max-w-lg bg-[#141313] text-white rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] flex flex-col overflow-hidden my-auto"
       >
         {/* Modal Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 shrink-0">
@@ -234,7 +234,7 @@ export default function DayActivityModal({
         </div>
 
         {/* Modal Body */}
-        <div className="overflow-y-auto py-4 space-y-4 flex-1 pr-1">
+        <div className="overflow-y-auto py-3 space-y-3.5 flex-1 pr-1 overscroll-contain">
           {/* Notifications */}
           {errorMessage && (
             <div className="p-3 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-mono">
@@ -255,7 +255,7 @@ export default function DayActivityModal({
             </label>
 
             {activeImageUrl ? (
-              <div className="relative group rounded-2xl overflow-hidden border border-slate-700 bg-black aspect-[4/3] sm:aspect-[16/10] flex items-center justify-center">
+              <div className="relative group rounded-2xl overflow-hidden border border-slate-700 bg-black aspect-[16/10] max-h-48 sm:max-h-60 flex items-center justify-center">
                 <img
                   src={activeImageUrl}
                   alt={`Activity for ${date}`}
@@ -380,13 +380,13 @@ export default function DayActivityModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
+        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 shrink-0 pb-1">
           {initialEntry && !selectedFile ? (
             <button
               type="button"
               disabled={isDeleting || isUploading}
               onClick={handleDelete}
-              className="px-4 py-2.5 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 font-mono text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 font-mono text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Remove Photo
@@ -400,7 +400,7 @@ export default function DayActivityModal({
               type="button"
               disabled={isUploading || isDeleting}
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
+              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
             >
               Close
             </button>
@@ -413,7 +413,7 @@ export default function DayActivityModal({
                 type="button"
                 disabled={isUploading || isDeleting}
                 onClick={handleSave}
-                className="px-5 py-2.5 rounded-xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-sm font-bold cursor-pointer transition-all shadow-md flex items-center gap-2 disabled:opacity-60"
+                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-xs sm:text-sm font-bold cursor-pointer transition-all shadow-md flex items-center gap-1.5 disabled:opacity-60"
               >
                 {isUploading ? (
                   <>

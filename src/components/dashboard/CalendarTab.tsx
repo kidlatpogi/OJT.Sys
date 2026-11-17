@@ -201,11 +201,11 @@ export default function CalendarTab({
         </div>
 
         {/* Weekday Columns Header */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 pt-4 pb-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2.5 pt-4 pb-2">
           {WEEKDAY_LABELS.map((day) => (
             <div
               key={day}
-              className="text-center font-mono text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider"
+              className="text-center font-mono text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider"
             >
               {day}
             </div>
@@ -213,7 +213,7 @@ export default function CalendarTab({
         </div>
 
         {/* 7-Column Monthly Grid matching Reference Layout */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 pt-1">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2.5 pt-1">
           {monthGrid.map((cell, index) => {
             if (!cell) {
               // Empty spacer slot for leading days before 1st of month
@@ -236,7 +236,7 @@ export default function CalendarTab({
                 key={cell.date}
                 type="button"
                 onClick={() => setModalDate(cell.date)}
-                className={`group relative aspect-[3/4] rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 select-none flex flex-col justify-between p-1.5 sm:p-2.5 text-left border ${
+                className={`group relative aspect-[3/4] rounded-lg sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 select-none flex flex-col justify-between p-1 sm:p-2.5 text-left border ${
                   isToday
                     ? 'ring-2 ring-[#C44900] ring-offset-2 ring-offset-[#141313] border-[#C44900]'
                     : 'border-white/5 hover:border-white/20'

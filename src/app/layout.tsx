@@ -80,7 +80,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${robotoMono.variable} scroll-smooth`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${robotoMono.variable} scroll-smooth`}
+    >
       <head>
         <link
           rel="preload"
@@ -97,7 +101,10 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="min-h-[100dvh] bg-[#f8f8f8] text-black font-sans antialiased selection:bg-[#C44900]/20 selection:text-black">
+      <body
+        suppressHydrationWarning
+        className="min-h-[100dvh] bg-[#f8f8f8] text-black font-sans antialiased selection:bg-[#C44900]/20 selection:text-black"
+      >
         {children}
       </body>
     </html>

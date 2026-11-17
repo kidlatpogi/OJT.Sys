@@ -31,6 +31,7 @@ interface PunchClockCardProps {
   profile: UserProfile;
   todayLog: AttendanceLog | null;
   onSaveLog: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
+  onCalendarUpdated?: () => void;
 }
 
 function getTodayShiftEndDate(dailyEndTime: string): Date | null {
@@ -46,6 +47,7 @@ export default function PunchClockCard({
   profile,
   todayLog,
   onSaveLog,
+  onCalendarUpdated,
 }: PunchClockCardProps) {
   const [now, setNow] = useState<Date | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -69,6 +71,21 @@ export default function PunchClockCard({
   const autoTimeOutTriggeredRef = useRef(false);
   const justTimedOutRef = useRef(false);
 
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoPreview((prev) => {
+      if (prev && prev.startsWith('blob:')) {
+        URL.revokeObjectURL(prev);
+      }
+      return null;
+    });
+    setSelectedPhoto(null);
+    setExistingPhotoUrl(null);
+    setPhotoError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
   useEffect(() => {
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -77,8 +94,7 @@ export default function PunchClockCard({
 
   useEffect(() => {
     if (todayLog) {
-      if (justTimedOutRef.current && todayLog.time_out) {
-        justTimedOutRef.current = false;
+      if (todayLog.time_out) {
         setSelectedTasks([]);
         setCustomTasks('');
         setAiSummary('');
@@ -86,6 +102,7 @@ export default function PunchClockCard({
         setTasksDirty(false);
         autoTimeOutTriggeredRef.current = true;
         setAutoTimeOutBlocked(false);
+        handleRemovePhoto();
         return;
       }
       setSelectedTasks(todayLog.tasks_selected || []);
@@ -93,10 +110,6 @@ export default function PunchClockCard({
       setAiSummary(todayLog.ai_summary || '');
       setAiProvider(todayLog.ai_provider || 'manual');
       setTasksDirty(false);
-      if (todayLog.time_out) {
-        autoTimeOutTriggeredRef.current = true;
-        setAutoTimeOutBlocked(false);
-      }
     } else {
       setSelectedTasks([]);
       setCustomTasks('');
@@ -105,8 +118,9 @@ export default function PunchClockCard({
       setTasksDirty(false);
       autoTimeOutTriggeredRef.current = false;
       setAutoTimeOutBlocked(false);
+      handleRemovePhoto();
     }
-  }, [todayLog]);
+  }, [todayLog, handleRemovePhoto]);
 
   const showToast = useCallback((msg: string, variant: 'success' | 'error' = 'success') => {
     setToast({ msg, variant });
@@ -121,11 +135,16 @@ export default function PunchClockCard({
   // Check if today already has a calendar entry
   useEffect(() => {
     if (!profile.id) return;
+    if (todayLog?.time_out) {
+      setExistingPhotoUrl(null);
+      setPhotoPreview(null);
+      return;
+    }
     let active = true;
     fetchCalendarEntryByDate(profile.id, todayStr)
       .then((entry) => {
         if (!active) return;
-        if (entry?.image_url) {
+        if (entry?.image_url && !todayLog?.time_out) {
           setExistingPhotoUrl(entry.image_url);
           setPhotoPreview(entry.image_url);
         } else {
@@ -139,7 +158,7 @@ export default function PunchClockCard({
     return () => {
       active = false;
     };
-  }, [profile.id, todayStr]);
+  }, [profile.id, todayStr, todayLog?.time_out]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -168,19 +187,6 @@ export default function PunchClockCard({
     const objUrl = URL.createObjectURL(file);
     setSelectedPhoto(file);
     setPhotoPreview(objUrl);
-  };
-
-  const handleRemovePhoto = () => {
-    if (photoPreview && photoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(photoPreview);
-    }
-    setSelectedPhoto(null);
-    setPhotoPreview(null);
-    setExistingPhotoUrl(null);
-    setPhotoError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const handlePhotoDrop = (e: React.DragEvent) => {
@@ -292,6 +298,7 @@ export default function PunchClockCard({
 
         // Sync photo with calendar entry
         await syncCalendarPhoto(polished.summary);
+        onCalendarUpdated?.();
 
         setAutoTimeOutBlocked(false);
         setSelectedTasks([]);
@@ -299,6 +306,7 @@ export default function PunchClockCard({
         setAiSummary('');
         setAiProvider('manual');
         setTasksDirty(false);
+        handleRemovePhoto();
 
         if (reason === 'auto') {
           showToast(
@@ -330,6 +338,8 @@ export default function PunchClockCard({
       selectedTasks,
       customTasks,
       syncCalendarPhoto,
+      handleRemovePhoto,
+      onCalendarUpdated,
       showToast,
     ]
   );
@@ -407,6 +417,15 @@ export default function PunchClockCard({
     setPendingAction('time-out');
   };
 
+  const handleSaveTodayLogClick = () => {
+    if (!todayLog?.time_in) return;
+    if (selectedTasks.length === 0) {
+      showToast('Please check at least one task under "What did you work on?" before saving.', 'error');
+      return;
+    }
+    setPendingAction('save-log');
+  };
+
   const handleFormatCustomNotes = async () => {
     if (!customTasks.trim()) return;
     setIsSaving(true);
@@ -426,10 +445,8 @@ export default function PunchClockCard({
     if (!action) return;
     if (action === 'time-in') {
       await handleTimeIn();
-    } else if (action === 'time-out') {
+    } else if (action === 'time-out' || action === 'save-log') {
       await executeTimeOut(new Date().toISOString(), 'manual');
-    } else if (action === 'save-log') {
-      await handleSaveTasks();
     } else if (action === 'format-notes') {
       await handleFormatCustomNotes();
     }
@@ -503,10 +520,16 @@ export default function PunchClockCard({
       <section className="bg-[#141313] text-white rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 block truncate">
+            <span
+              suppressHydrationWarning
+              className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 block truncate"
+            >
               {liveDateStr}
             </span>
-            <div className="font-mono text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 tabular-nums">
+            <div
+              suppressHydrationWarning
+              className="font-mono text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 tabular-nums"
+            >
               {liveTimeStr}
             </div>
           </div>
@@ -528,13 +551,19 @@ export default function PunchClockCard({
         <div className="grid grid-cols-3 gap-2.5 mt-5">
           <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
             <span className="block font-mono text-[10px] uppercase text-slate-400">Time In</span>
-            <span className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block">
+            <span
+              suppressHydrationWarning
+              className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
+            >
               {formatTimeDisplay(todayLog?.time_in || null)}
             </span>
           </div>
           <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
             <span className="block font-mono text-[10px] uppercase text-slate-400">Time Out</span>
-            <span className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block">
+            <span
+              suppressHydrationWarning
+              className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
+            >
               {formatTimeDisplay(todayLog?.time_out || null)}
             </span>
           </div>
@@ -827,11 +856,11 @@ export default function PunchClockCard({
           <button
             type="button"
             disabled={isChecklistLocked || isSaving}
-            onClick={() => setPendingAction('save-log')}
+            onClick={handleSaveTodayLogClick}
             className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 disabled:cursor-not-allowed text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            {isSaving ? 'Saving & Formatting...' : 'Save Today’s Log'}
+            {isSaving ? 'Saving & Timing Out...' : 'Save Today’s Log'}
           </button>
         </div>
       </section>
@@ -842,7 +871,7 @@ export default function PunchClockCard({
         title={
           pendingAction === 'time-in'
             ? 'Confirm Time-In'
-            : pendingAction === 'time-out'
+            : pendingAction === 'time-out' || pendingAction === 'save-log'
             ? 'Confirm Time-Out'
             : pendingAction === 'format-notes'
             ? 'Add Notes to Summary'
@@ -851,7 +880,7 @@ export default function PunchClockCard({
         description={
           pendingAction === 'time-in'
             ? `Record your Time-In for ${liveDateStr} at ${liveTimeStr}?`
-            : pendingAction === 'time-out'
+            : pendingAction === 'time-out' || pendingAction === 'save-log'
             ? `Complete your shift and record Time-Out at ${liveTimeStr}? Your selected tasks will be formatted automatically for your reports.`
             : pendingAction === 'format-notes'
             ? 'Format your custom notes (along with any checked tasks) into past-tense statements for the Weekly & Monthly Report Summary?'
@@ -860,7 +889,7 @@ export default function PunchClockCard({
         confirmLabel={
           pendingAction === 'time-in'
             ? 'Time In'
-            : pendingAction === 'time-out'
+            : pendingAction === 'time-out' || pendingAction === 'save-log'
             ? 'Time Out'
             : pendingAction === 'format-notes'
             ? 'Add to Summary'
