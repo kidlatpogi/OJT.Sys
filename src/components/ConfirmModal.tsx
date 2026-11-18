@@ -47,7 +47,7 @@ export default function ConfirmModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={() => {
         if (!loading) onCancel();
       }}
@@ -57,7 +57,7 @@ export default function ConfirmModal({
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-200 shadow-2xl max-h-[84dvh] overflow-y-auto"
+        className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto my-auto"
       >
         <div className="flex items-start justify-between gap-3">
           <h3

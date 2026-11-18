@@ -1,3 +1,9 @@
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  category: string;
+}
+
 export interface UserProfile {
   id: string;
   email?: string;
@@ -16,12 +22,37 @@ export interface UserProfile {
   lunch_break_minutes: number;
   auto_time_out?: boolean;
   document_checklist?: string[];
+  work_checklist?: ChecklistItem[];
+  active_internship_id?: string | null;
   academic_term: string;
+}
+
+export interface Internship {
+  id: string;
+  user_id: string;
+  title: string;
+  company_name: string;
+  branch_department: string;
+  supervisor_name: string;
+  supervisor_position: string;
+  trainor_name: string;
+  start_date: string;
+  target_hours: number;
+  daily_start_time: string;
+  daily_end_time: string;
+  lunch_break_minutes: number;
+  auto_time_out?: boolean;
+  document_checklist?: string[];
+  academic_term: string;
+  status: 'active' | 'completed' | 'archived';
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface AttendanceLog {
   id: string;
   user_id: string;
+  internship_id?: string | null;
   date: string; // YYYY-MM-DD
   time_in: string | null; // ISO timestamp
   time_out: string | null; // ISO timestamp
@@ -42,7 +73,19 @@ export interface WeeklySummary {
   total_weekly_hours: number;
 }
 
-export const PRESET_OJT_TASKS: { id: string; label: string; category: string }[] = [
+export interface CalendarEntry {
+  id: string;
+  user_id: string;
+  internship_id?: string | null;
+  date: string; // YYYY-MM-DD
+  image_url: string;
+  title?: string;
+  description: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const PRESET_OJT_TASKS: ChecklistItem[] = [
   { id: 'frontend_ui', label: 'Frontend UI Implementation', category: 'Engineering' },
   { id: 'api_integration', label: 'API Integration & Endpoints', category: 'Engineering' },
   { id: 'database_migration', label: 'Database Schema & Queries', category: 'Data' },

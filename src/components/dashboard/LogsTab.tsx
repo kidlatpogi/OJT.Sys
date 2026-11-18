@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarPlus, Pencil, Trash2, X } from 'lucide-react';
-import { AttendanceLog, UserProfile } from '@/types/ojt';
+import { CalendarPlus, Camera, Clock, Pencil, Trash2, X } from 'lucide-react';
+import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
+import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
+import ImageModal from '@/components/ImageModal';
 import {
   calculateShiftHours,
   formatHoursWhole,
@@ -12,15 +14,23 @@ import {
   formatTimeDisplay,
   getTodayDateString,
 } from '@/lib/ojt-calculations';
+import { fetchCalendarEntries } from '@/lib/calendar-service';
 
 interface LogsTabProps {
   profile: UserProfile;
   logs: AttendanceLog[];
+  calendarEntries?: CalendarEntry[];
   onSaveLog: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
   onDeleteLog: (id: string) => Promise<void>;
 }
 
-export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsTabProps) {
+export default function LogsTab({
+  profile,
+  logs,
+  calendarEntries,
+  onSaveLog,
+  onDeleteLog,
+}: LogsTabProps) {
   const [editing, setEditing] = useState<AttendanceLog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -32,6 +42,41 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
   const [emptySummaryModalOpen, setEmptySummaryModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceLog | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [entries, setEntries] = useState<CalendarEntry[]>(calendarEntries || []);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{
+    imageUrl: string;
+    date: string;
+    title: string;
+    description: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (calendarEntries && calendarEntries.length > 0) {
+      setEntries(calendarEntries);
+    }
+  }, [calendarEntries]);
+
+  useEffect(() => {
+    if (!profile.id) return;
+    let active = true;
+    fetchCalendarEntries(profile.id).then((data) => {
+      if (active && data) {
+        setEntries(data);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [profile.id, logs, calendarEntries]);
+
+  const calendarMap = useMemo(() => {
+    const map = new Map<string, CalendarEntry>();
+    entries.forEach((e) => {
+      if (e.date) map.set(e.date, e);
+    });
+    return map;
+  }, [entries]);
 
   const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -90,12 +135,15 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
     setIsModalOpen(false);
   };
 
-  const handleConfirmedDelete = async () => {
+  const handleConfirmedDelete = async (_password: string) => {
     if (!deleteTarget) return;
     setSubmitting(true);
-    await onDeleteLog(deleteTarget.id);
-    setSubmitting(false);
-    setDeleteTarget(null);
+    try {
+      await onDeleteLog(deleteTarget.id);
+      setDeleteTarget(null);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -129,51 +177,108 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
         </div>
       ) : (
         <div className="space-y-3">
-          {sorted.map((log) => (
-            <article
-              key={log.id}
-              className="bg-white border-2 border-slate-200/80 hover:border-[#C44900] rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className="font-mono text-xs font-bold uppercase text-[#C44900]">
-                    {formatReportDate(log.date)}
-                  </span>
-                  <div className="font-mono text-xs sm:text-sm text-slate-600 mt-0.5">
-                    {formatTimeDisplay(log.time_in)} → {formatTimeDisplay(log.time_out)}
+          {sorted.map((log) => {
+            const calEntry = calendarMap.get(log.date);
+            const hasPhoto = Boolean(calEntry?.image_url);
+            const displayTitle = calEntry?.title || 'What did you work on?';
+            const displayNotes = calEntry?.description || '';
+
+            return (
+              <article
+                key={log.id}
+                className="bg-white border-2 border-slate-200/80 hover:border-[#C44900] rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="font-mono text-xs font-bold uppercase text-[#C44900]">
+                      {formatReportDate(log.date)}
+                    </span>
+                    <div className="font-mono text-xs sm:text-sm text-slate-600 mt-0.5">
+                      {formatTimeDisplay(log.time_in)} → {formatTimeDisplay(log.time_out)}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-1 rounded-full bg-slate-100 font-mono text-xs font-bold text-slate-900">
+                      {formatHoursWhole(log.hours_worked)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Edit log"
+                      onClick={() => openEditModal(log)}
+                      className="p-2 rounded-xl text-slate-500 hover:text-black hover:bg-slate-100 cursor-pointer"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Delete log"
+                      onClick={() => setDeleteTarget(log)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2.5 py-1 rounded-full bg-slate-100 font-mono text-xs font-bold text-slate-900">
-                    {formatHoursWhole(log.hours_worked)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Edit log"
-                    onClick={() => openEditModal(log)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-black hover:bg-slate-100 cursor-pointer"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Delete log"
-                    onClick={() => setDeleteTarget(log)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                {/* Attached Photo & Activity Notes Strip */}
+                {hasPhoto && calEntry && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start gap-3 bg-slate-50/80 rounded-2xl p-3 border border-slate-200/60">
+                    <button
+                      type="button"
+                      aria-label={`View full photo for ${formatReportDate(log.date)}: ${displayTitle}`}
+                      onClick={() =>
+                        setLightboxPhoto({
+                          imageUrl: calEntry.image_url,
+                          date: log.date,
+                          title: displayTitle,
+                          description: displayNotes,
+                        })
+                      }
+                      className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-slate-200 bg-black group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#C44900] shadow-xs"
+                    >
+                      <img
+                        src={calEntry.image_url}
+                        alt={displayTitle}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="p-1.5 rounded-lg bg-black/60 text-white">
+                          <Camera className="w-4 h-4" />
+                        </span>
+                      </div>
+                    </button>
 
-              {(log.ai_summary || log.custom_tasks || log.tasks_selected.length > 0) && (
-                <div className="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
-                  {log.ai_summary || log.custom_tasks || log.tasks_selected.join(', ')}
-                </div>
-              )}
-            </article>
-          ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#C44900]">
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{displayTitle}</span>
+                      </div>
+
+                      {displayNotes ? (
+                        <p className="mt-1 text-xs sm:text-sm text-slate-700 font-sans whitespace-pre-line leading-relaxed">
+                          {displayNotes}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-slate-400 italic">No additional activity notes</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Accomplishments Summary (shown when distinct from displayNotes or when no photo) */}
+                {(log.ai_summary || log.custom_tasks || log.tasks_selected.length > 0) &&
+                  (!hasPhoto ||
+                    (log.ai_summary !== displayNotes &&
+                      (log.ai_summary || log.custom_tasks || log.tasks_selected.join(', ')) !== displayNotes)) && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                      {log.ai_summary || log.custom_tasks || log.tasks_selected.join(', ')}
+                    </div>
+                  )}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -181,16 +286,22 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
       {isModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <div className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-slate-200 max-h-[84dvh] overflow-y-auto shadow-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-clash-semibold text-xl font-bold text-black">
-                  {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
-                </h3>
+          <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto shadow-2xl my-auto">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#C44900] font-bold">
+                    <Clock className="w-3.5 h-3.5" />
+                    What did you work on?
+                  </span>
+                  <h3 className="font-clash-semibold text-lg sm:text-xl font-bold text-black mt-0.5">
+                    {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
+                  </h3>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 cursor-pointer"
+                  className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-slate-100 text-slate-500 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -237,6 +348,22 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
                   </div>
                 </div>
 
+                {/* Day Photo Preview if attached in Calendar */}
+                {calendarMap.get(date)?.image_url && (
+                  <div className="space-y-1.5">
+                    <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+                      Day Photo (Calendar Entry)
+                    </label>
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 aspect-[16/9] max-h-40 bg-slate-900 flex items-center justify-center">
+                      <img
+                        src={calendarMap.get(date)!.image_url}
+                        alt={`Photo for ${date}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
                     Daily Accomplishments (Past Tense)
@@ -252,7 +379,7 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
 
                 <button
                   type="submit"
-                  className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base cursor-pointer"
+                  className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base cursor-pointer shadow-sm active:scale-[0.99] transition-all"
                 >
                   Save Attendance Log
                 </button>
@@ -287,20 +414,28 @@ export default function LogsTab({ profile, logs, onSaveLog, onDeleteLog }: LogsT
         onCancel={() => setEmptySummaryModalOpen(false)}
       />
 
-      <ConfirmModal
+      {/* Protected Log Deletion Modal (R8) */}
+      <ProtectedDeleteModal
         isOpen={deleteTarget !== null}
+        targetLog={deleteTarget}
+        logDate={deleteTarget?.date}
+        userEmail={profile.email}
         loading={submitting}
-        variant="danger"
-        title="Delete Attendance Log"
-        description={
-          deleteTarget
-            ? `Are you sure you want to permanently delete your attendance log for ${formatReportDate(deleteTarget.date)}? This cannot be undone.`
-            : ''
-        }
-        confirmLabel="Delete Log"
         onConfirm={handleConfirmedDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* Unified Reusable Image Modal */}
+      {lightboxPhoto && (
+        <ImageModal
+          isOpen={Boolean(lightboxPhoto)}
+          onClose={() => setLightboxPhoto(null)}
+          imageUrl={lightboxPhoto.imageUrl}
+          date={lightboxPhoto.date}
+          title={lightboxPhoto.title}
+          description={lightboxPhoto.description}
+        />
+      )}
     </div>
   );
 }

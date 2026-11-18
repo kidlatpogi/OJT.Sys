@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Clock, LogOut, Save } from 'lucide-react';
+import { LogOut, Save } from 'lucide-react';
 import { UserProfile } from '@/types/ojt';
-import { formatStudentIdInput } from '@/lib/validation';
 import ConfirmModal from '@/components/ConfirmModal';
+import StandardProfileFields, {
+  combineFullName,
+  splitFullName,
+  StandardProfileFormData,
+} from '@/components/dashboard/StandardProfileFields';
 
 interface ProfileTabProps {
   profile: UserProfile;
@@ -13,24 +17,71 @@ interface ProfileTabProps {
 }
 
 export default function ProfileTab({ profile, onSaveProfile, onSignOut }: ProfileTabProps) {
-  const [form, setForm] = useState<UserProfile>(profile);
+  const [formData, setFormData] = useState<StandardProfileFormData>(() => {
+    const { firstName, lastName } = splitFullName(profile.full_name);
+    return {
+      firstName,
+      lastName,
+      studentId: profile.student_id || '',
+      program: profile.program || 'BSIT',
+      companyName: profile.company_name || '',
+      branchDepartment: profile.branch_department || '',
+      supervisorName: profile.supervisor_name || '',
+      trainorName: profile.trainor_name || '',
+      targetHours: profile.target_hours || 500,
+      lunchBreakMinutes: profile.lunch_break_minutes ?? 0,
+      dailyStartTime: (profile.daily_start_time || '09:00').slice(0, 5),
+      dailyEndTime: (profile.daily_end_time || '18:00').slice(0, 5),
+    };
+  });
+  const [autoTimeOut, setAutoTimeOut] = useState(profile.auto_time_out !== false);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    setForm(profile);
+    const { firstName, lastName } = splitFullName(profile.full_name);
+    setFormData({
+      firstName,
+      lastName,
+      studentId: profile.student_id || '',
+      program: profile.program || 'BSIT',
+      companyName: profile.company_name || '',
+      branchDepartment: profile.branch_department || '',
+      supervisorName: profile.supervisor_name || '',
+      trainorName: profile.trainor_name || '',
+      targetHours: profile.target_hours || 500,
+      lunchBreakMinutes: profile.lunch_break_minutes ?? 0,
+      dailyStartTime: (profile.daily_start_time || '09:00').slice(0, 5),
+      dailyEndTime: (profile.daily_end_time || '18:00').slice(0, 5),
+    });
+    setAutoTimeOut(profile.auto_time_out !== false);
   }, [profile]);
 
-  const updateField = <K extends keyof UserProfile>(key: K, val: UserProfile[K]) => {
-    setForm((prev) => ({ ...prev, [key]: val }));
+  const handleFieldChange = (field: keyof StandardProfileFormData, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await onSaveProfile(form);
+    const updatedProfile: UserProfile = {
+      ...profile,
+      full_name: combineFullName(formData.firstName, formData.lastName),
+      student_id: formData.studentId,
+      program: formData.program,
+      company_name: formData.companyName.trim(),
+      branch_department: formData.branchDepartment.trim(),
+      supervisor_name: formData.supervisorName.trim(),
+      trainor_name: formData.trainorName.trim(),
+      target_hours: Number(formData.targetHours) || 500,
+      lunch_break_minutes: Number(formData.lunchBreakMinutes) || 0,
+      daily_start_time: formData.dailyStartTime,
+      daily_end_time: formData.dailyEndTime,
+      auto_time_out: autoTimeOut,
+    };
+    await onSaveProfile(updatedProfile);
     setSaving(false);
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2400);
@@ -62,158 +113,10 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
         onSubmit={handleSubmit}
         className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-5"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Trainee Full Name
-            </label>
-            <input
-              type="text"
-              required
-              value={form.full_name}
-              onChange={(e) => updateField('full_name', e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
+        <StandardProfileFields formData={formData} onChange={handleFieldChange} />
 
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Student ID &amp; Program
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                maxLength={11}
-                pattern="\d{4}-\d{6}"
-                value={form.student_id}
-                onChange={(e) => updateField('student_id', formatStudentIdInput(e.target.value))}
-                placeholder="2024-100001"
-                className="w-full h-11 px-3 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none font-mono text-sm"
-              />
-              <select
-                value={form.program === 'BSCS' ? 'BSCS' : 'BSIT'}
-                onChange={(e) => updateField('program', e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-              >
-                <option value="BSIT">BSIT</option>
-                <option value="BSCS">BSCS</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Company Name
-            </label>
-            <input
-              type="text"
-              required
-              value={form.company_name}
-              onChange={(e) => updateField('company_name', e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Branch / Department
-            </label>
-            <input
-              type="text"
-              value={form.branch_department}
-              onChange={(e) => updateField('branch_department', e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Supervisor Name
-            </label>
-            <input
-              type="text"
-              value={form.supervisor_name}
-              onChange={(e) => updateField('supervisor_name', e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Trainor Name
-            </label>
-            <input
-              type="text"
-              value={form.trainor_name}
-              onChange={(e) => updateField('trainor_name', e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Required OJT Hours
-            </label>
-            <input
-              type="number"
-              min={50}
-              max={1500}
-              value={form.target_hours}
-              onChange={(e) => updateField('target_hours', Number(e.target.value) || 500)}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-              Lunch Break Deduction (Minutes)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={180}
-              value={form.lunch_break_minutes}
-              onChange={(e) => updateField('lunch_break_minutes', Math.max(0, Number(e.target.value) || 0))}
-              className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Shift Schedule & Auto Time-Out Configuration */}
+        {/* Auto Time-Out Configuration */}
         <div className="pt-4 border-t border-slate-100 space-y-4">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#C44900]" />
-            <span className="font-mono text-xs uppercase tracking-wider font-bold text-slate-800">
-              Shift Schedule &amp; Auto Time-Out
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-                Shift Start Time
-              </label>
-              <input
-                type="time"
-                value={(form.daily_start_time || '09:00').slice(0, 5)}
-                onChange={(e) => updateField('daily_start_time', e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-1">
-                Shift End Time
-              </label>
-              <input
-                type="time"
-                value={(form.daily_end_time || '18:00').slice(0, 5)}
-                onChange={(e) => updateField('daily_end_time', e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none font-mono"
-              />
-            </div>
-          </div>
-
           <label className="flex items-start justify-between gap-4 p-4 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 cursor-pointer hover:border-[#C44900]/50 transition-colors">
             <div>
               <span className="block font-sans text-sm font-bold text-slate-900">
@@ -225,8 +128,8 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
             </div>
             <input
               type="checkbox"
-              checked={form.auto_time_out !== false}
-              onChange={(e) => updateField('auto_time_out', e.target.checked)}
+              checked={autoTimeOut}
+              onChange={(e) => setAutoTimeOut(e.target.checked)}
               className="mt-1 w-5 h-5 accent-[#C44900] rounded cursor-pointer shrink-0"
             />
           </label>
