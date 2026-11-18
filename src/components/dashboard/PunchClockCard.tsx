@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
@@ -8,12 +8,16 @@ import {
   Clock,
   LogIn,
   LogOut,
+  Pencil,
+  Plus,
+  RotateCcw,
   Save,
-  Sparkles,
+  SlidersHorizontal,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
-import { AttendanceLog, PRESET_OJT_TASKS, UserProfile } from '@/types/ojt';
+import { AttendanceLog, ChecklistItem, PRESET_OJT_TASKS, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
 import {
   calculateShiftHours,
@@ -32,7 +36,19 @@ interface PunchClockCardProps {
   todayLog: AttendanceLog | null;
   onSaveLog: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
   onCalendarUpdated?: () => void;
+  onUpdateChecklist?: (items: ChecklistItem[]) => Promise<void>;
 }
+
+const DEFAULT_CATEGORIES = [
+  'Engineering',
+  'Data',
+  'Quality',
+  'DevOps',
+  'Docs',
+  'Collab',
+  'Ops',
+  'Design',
+];
 
 function getTodayShiftEndDate(dailyEndTime: string): Date | null {
   const clean = (dailyEndTime || '18:00').slice(0, 5);
@@ -48,6 +64,7 @@ export default function PunchClockCard({
   todayLog,
   onSaveLog,
   onCalendarUpdated,
+  onUpdateChecklist,
 }: PunchClockCardProps) {
   const [now, setNow] = useState<Date | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -59,6 +76,79 @@ export default function PunchClockCard({
   const [toast, setToast] = useState<{ msg: string; variant: 'success' | 'error' } | null>(null);
   const [autoTimeOutBlocked, setAutoTimeOutBlocked] = useState(false);
   const [pendingAction, setPendingAction] = useState<'time-in' | 'time-out' | 'save-log' | 'format-notes' | null>(null);
+
+  // Dynamic Checklist Management States
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(() => {
+    return profile.work_checklist && profile.work_checklist.length > 0
+      ? profile.work_checklist
+      : PRESET_OJT_TASKS;
+  });
+  const [isManagingTasks, setIsManagingTasks] = useState(false);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState('');
+  const [editingCategory, setEditingCategory] = useState('Engineering');
+  const [newTaskLabel, setNewTaskLabel] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('Engineering');
+  const [showReloadConfirm, setShowReloadConfirm] = useState(false);
+  const [userCustomTags, setUserCustomTags] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('ojt_custom_tags_' + profile.id);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newTaskCustomInput, setNewTaskCustomInput] = useState('');
+  const [editingCustomInput, setEditingCustomInput] = useState('');
+
+  const registerCustomTag = useCallback((tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'custom') return;
+    setUserCustomTags((prev) => {
+      const lower = trimmed.toLowerCase();
+      if (prev.some((t) => t.toLowerCase() === lower)) return prev;
+      const updated = [...prev, trimmed];
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ojt_custom_tags_' + profile.id, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to cache custom tag:', e);
+        }
+      }
+      return updated;
+    });
+  }, [profile.id]);
+
+  const availableCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+
+    const addTag = (tag: string) => {
+      const trimmed = tag.trim();
+      if (!trimmed || trimmed === '__custom__') return;
+      const lower = trimmed.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(trimmed);
+      }
+    };
+
+    DEFAULT_CATEGORIES.forEach(addTag);
+    checklistItems.forEach((t) => {
+      if (t.category) addTag(t.category);
+    });
+    userCustomTags.forEach(addTag);
+
+    return list;
+  }, [checklistItems, userCustomTags]);
+
+  useEffect(() => {
+    if (profile.work_checklist && profile.work_checklist.length > 0) {
+      setChecklistItems(profile.work_checklist);
+    }
+  }, [profile.work_checklist]);
 
   // Photo Attachment & Calendar Sync States
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
@@ -141,7 +231,7 @@ export default function PunchClockCard({
       return;
     }
     let active = true;
-    fetchCalendarEntryByDate(profile.id, todayStr)
+    fetchCalendarEntryByDate(profile.id, todayStr, profile.active_internship_id)
       .then((entry) => {
         if (!active) return;
         if (entry?.image_url && !todayLog?.time_out) {
@@ -158,7 +248,7 @@ export default function PunchClockCard({
     return () => {
       active = false;
     };
-  }, [profile.id, todayStr, todayLog?.time_out]);
+  }, [profile.id, profile.active_internship_id, todayStr, todayLog?.time_out]);
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -215,19 +305,33 @@ export default function PunchClockCard({
       try {
         if (selectedPhoto) {
           const uploadedUrl = await uploadCalendarImage(profile.id, todayStr, selectedPhoto);
-          await saveCalendarEntry(profile.id, todayStr, uploadedUrl, summaryText, 'What did you work on?');
+          await saveCalendarEntry(
+            profile.id,
+            todayStr,
+            uploadedUrl,
+            summaryText,
+            'What did you work on?',
+            profile.active_internship_id
+          );
           setExistingPhotoUrl(uploadedUrl);
           setSelectedPhoto(null);
           setPhotoPreview(uploadedUrl);
         } else if (existingPhotoUrl) {
-          await saveCalendarEntry(profile.id, todayStr, existingPhotoUrl, summaryText, 'What did you work on?');
+          await saveCalendarEntry(
+            profile.id,
+            todayStr,
+            existingPhotoUrl,
+            summaryText,
+            'What did you work on?',
+            profile.active_internship_id
+          );
         }
       } catch (err) {
         console.error('Failed to sync calendar entry:', err);
         showToast('Saved log, but could not sync photo to calendar.', 'error');
       }
     },
-    [profile.id, todayStr, selectedPhoto, existingPhotoUrl, showToast]
+    [profile.id, profile.active_internship_id, todayStr, selectedPhoto, existingPhotoUrl, showToast]
   );
 
   const toggleTask = (label: string) => {
@@ -236,6 +340,116 @@ export default function PunchClockCard({
     setSelectedTasks((prev) =>
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
     );
+  };
+
+  const handleReloadPreloadedTasks = async () => {
+    setChecklistItems(PRESET_OJT_TASKS);
+    setShowReloadConfirm(false);
+    setIsManagingTasks(false);
+    setEditingTaskId(null);
+    if (onUpdateChecklist) {
+      await onUpdateChecklist(PRESET_OJT_TASKS);
+    }
+    showToast('Restored 8 pre-loaded default tasks.', 'success');
+  };
+
+  const handleAddTask = async () => {
+    const trimmed = newTaskLabel.trim();
+    if (!trimmed) return;
+    if (checklistItems.some((t) => t.label.toLowerCase() === trimmed.toLowerCase())) {
+      showToast('A task with this label already exists.', 'error');
+      return;
+    }
+    const resolvedCategory =
+      newTaskCategory === '__custom__'
+        ? newTaskCustomInput.trim() || 'Custom'
+        : newTaskCategory.trim() || 'Custom';
+
+    if (newTaskCategory === '__custom__' && newTaskCustomInput.trim()) {
+      registerCustomTag(newTaskCustomInput.trim());
+    }
+
+    const newItem: ChecklistItem = {
+      id: `task_${Date.now()}`,
+      label: trimmed,
+      category: resolvedCategory,
+    };
+    const updated = [...checklistItems, newItem];
+    setChecklistItems(updated);
+    setNewTaskLabel('');
+    setNewTaskCustomInput('');
+    setIsAddingTask(false);
+    if (onUpdateChecklist) {
+      await onUpdateChecklist(updated);
+    }
+    showToast(`Added "${trimmed}" to checklist.`, 'success');
+  };
+
+  const startEditTask = (task: ChecklistItem) => {
+    setEditingTaskId(task.id);
+    setEditingLabel(task.label);
+    setEditingCategory(task.category || 'Custom');
+    setEditingCustomInput('');
+  };
+
+  const handleSaveEdit = async () => {
+    const trimmed = editingLabel.trim();
+    if (!trimmed || !editingTaskId) return;
+
+    const originalTask = checklistItems.find((t) => t.id === editingTaskId);
+    if (!originalTask) return;
+
+    if (
+      checklistItems.some(
+        (t) => t.id !== editingTaskId && t.label.toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      showToast('Another task with this label already exists.', 'error');
+      return;
+    }
+
+    if (originalTask.label !== trimmed) {
+      setSelectedTasks((prev) =>
+        prev.map((t) => (t === originalTask.label ? trimmed : t))
+      );
+    }
+
+    const resolvedCategory =
+      editingCategory === '__custom__'
+        ? editingCustomInput.trim() || 'Custom'
+        : editingCategory.trim() || 'Custom';
+
+    if (editingCategory === '__custom__' && editingCustomInput.trim()) {
+      registerCustomTag(editingCustomInput.trim());
+    }
+
+    const updated = checklistItems.map((t) =>
+      t.id === editingTaskId
+        ? { ...t, label: trimmed, category: resolvedCategory }
+        : t
+    );
+
+    setChecklistItems(updated);
+    setEditingTaskId(null);
+    setEditingLabel('');
+    setEditingCustomInput('');
+    if (onUpdateChecklist) {
+      await onUpdateChecklist(updated);
+    }
+    showToast(`Updated task "${trimmed}".`, 'success');
+  };
+
+  const handleDeleteTask = async (task: ChecklistItem) => {
+    setSelectedTasks((prev) => prev.filter((t) => t !== task.label));
+    const updated = checklistItems.filter((t) => t.id !== task.id);
+    setChecklistItems(updated);
+    if (editingTaskId === task.id) {
+      setEditingTaskId(null);
+    }
+    if (onUpdateChecklist) {
+      await onUpdateChecklist(updated);
+    }
+    showToast(`Removed "${task.label}" from checklist.`, 'success');
   };
 
   const runAutoPolish = async (tasks: string[], custom: string) => {
@@ -519,13 +733,31 @@ export default function PunchClockCard({
       {/* Dark Hero Punch Clock Card */}
       <section className="bg-[#141313] text-white rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-sm">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <span
-              suppressHydrationWarning
-              className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 block truncate"
-            >
-              {liveDateStr}
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                suppressHydrationWarning
+                className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 truncate"
+              >
+                {liveDateStr}
+              </span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono font-bold uppercase tracking-wider shrink-0 ${
+                  isTimedOut
+                    ? 'bg-[#C44900] text-white border border-[#C44900]'
+                    : isTimedIn
+                    ? 'bg-[#C44900]/20 text-orange-300 border border-[#C44900]/50'
+                    : 'bg-white/10 text-slate-300 border border-white/10'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isTimedOut ? 'bg-white' : isTimedIn ? 'bg-emerald-400' : 'bg-slate-400'
+                  }`}
+                />
+                {isTimedOut ? 'Shift Done' : isTimedIn ? 'On Shift' : 'Not Timed In Yet'}
+              </span>
+            </div>
             <div
               suppressHydrationWarning
               className="font-mono text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 tabular-nums"
@@ -533,18 +765,6 @@ export default function PunchClockCard({
               {liveTimeStr}
             </div>
           </div>
-
-          <span
-            className={`px-3 py-1.5 rounded-full font-mono text-[11px] uppercase tracking-wider font-bold shrink-0 ${
-              isTimedOut
-                ? 'bg-[#C44900] text-white border border-[#C44900]'
-                : isTimedIn
-                ? 'bg-[#C44900]/20 text-orange-300 border border-[#C44900]/50'
-                : 'bg-white/10 text-slate-300 border border-white/10'
-            }`}
-          >
-            {isTimedOut ? 'Shift Done' : isTimedIn ? 'On Shift' : 'Not Clocked In'}
-          </span>
         </div>
 
         {/* Timestamps Strip */}
@@ -619,7 +839,7 @@ export default function PunchClockCard({
 
       {/* Smart Task Checklist & Auto-Formatted Weekly/Monthly Report Summary */}
       <section className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
               Daily Task Checklist
@@ -628,28 +848,274 @@ export default function PunchClockCard({
               What did you work on?
             </h2>
           </div>
-          <Clock className="w-5 h-5 text-[#C44900] shrink-0" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddingTask((prev) => !prev);
+                setIsManagingTasks(false);
+              }}
+              className="h-8 px-2.5 rounded-xl border border-slate-200 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-700 font-mono text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+              title="Add custom checklist item"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Task</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsManagingTasks((prev) => !prev);
+                setIsAddingTask(false);
+                setEditingTaskId(null);
+              }}
+              className={`h-8 px-2.5 rounded-xl border font-mono text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                isManagingTasks
+                  ? 'border-[#C44900] bg-[#C44900] text-white'
+                  : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+              }`}
+              title="Edit or delete checklist items"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>{isManagingTasks ? 'Done Editing' : 'Customize'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReloadConfirm(true)}
+              className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              title="Reload Pre-loaded Items"
+              aria-label="Reload Pre-loaded Items"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        {isChecklistLocked && (
-          <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-[#C44900] shrink-0 mt-0.5" />
-            <div className="font-mono text-xs leading-relaxed">
-              <p className="font-bold text-slate-900">
-                {!isTimedIn ? 'Not Timed In Yet' : 'Shift Finished — Already Clocked Out'}
-              </p>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                {!isTimedIn
-                  ? 'Tap "Tap to Time-In" above to unlock the task checklist, custom notes, and report summary.'
-                  : 'Your shift is complete and your accomplishments have been saved to Daily Logs.'}
-              </p>
+        {/* Inline Add Task Form */}
+        {isAddingTask && (
+          <div className="p-3.5 rounded-2xl bg-orange-50/50 border-2 border-orange-200/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs font-bold text-[#C44900]">
+                Add New Checklist Task
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAddingTask(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={newTaskLabel}
+                onChange={(e) => setNewTaskLabel(e.target.value)}
+                placeholder="e.g. Conduct user feedback interviews"
+                className="sm:col-span-2 h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:border-[#C44900] focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTask();
+                  }
+                }}
+              />
+              <select
+                value={newTaskCategory}
+                onChange={(e) => {
+                  setNewTaskCategory(e.target.value);
+                  if (e.target.value !== '__custom__') {
+                    setNewTaskCustomInput('');
+                  }
+                }}
+                className="h-10 px-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-700 focus:border-[#C44900] focus:outline-none"
+              >
+                {availableCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="__custom__">+ Custom Tag...</option>
+              </select>
+            </div>
+            {newTaskCategory === '__custom__' && (
+              <div>
+                <input
+                  type="text"
+                  value={newTaskCustomInput}
+                  onChange={(e) => setNewTaskCustomInput(e.target.value)}
+                  placeholder="Enter custom tag name (e.g. Research)"
+                  className="w-full h-9 px-3 rounded-xl border border-orange-300 bg-white text-xs text-slate-900 focus:border-[#C44900] focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTask();
+                    }
+                  }}
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddingTask(false)}
+                className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddTask}
+                disabled={!newTaskLabel.trim()}
+                className="h-8 px-3 rounded-lg bg-[#C44900] text-white text-xs font-mono font-bold hover:bg-[#9E3B00] disabled:opacity-50 cursor-pointer"
+              >
+                Save Task
+              </button>
             </div>
           </div>
         )}
 
-        <div className={`space-y-4 transition-opacity ${isChecklistLocked ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+        {/* Task Grid: In Manage Mode, items can be edited or deleted */}
+        {isManagingTasks ? (
+          <div className="space-y-2">
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs text-slate-600 font-mono">
+              <span>Editing Checklist Items ({checklistItems.length})</span>
+              <button
+                type="button"
+                onClick={() => setIsManagingTasks(false)}
+                className="text-[#C44900] font-bold hover:underline cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {checklistItems.map((task) => {
+                if (editingTaskId === task.id) {
+                  return (
+                    <div
+                      key={task.id}
+                      className="p-3 rounded-2xl border-2 border-[#C44900] bg-orange-50/40 space-y-2 col-span-1 sm:col-span-2 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[11px] font-bold text-[#C44900]">
+                          Edit Task
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTaskId(null)}
+                          className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input
+                          type="text"
+                          value={editingLabel}
+                          onChange={(e) => setEditingLabel(e.target.value)}
+                          className="sm:col-span-2 h-9 px-3 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:border-[#C44900] focus:outline-none"
+                          placeholder="Task description"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveEdit();
+                            }
+                          }}
+                        />
+                        <select
+                          value={editingCategory}
+                          onChange={(e) => {
+                            setEditingCategory(e.target.value);
+                            if (e.target.value !== '__custom__') {
+                              setEditingCustomInput('');
+                            }
+                          }}
+                          className="h-9 px-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-700 focus:border-[#C44900] focus:outline-none"
+                        >
+                          {availableCategories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Custom Tag...</option>
+                        </select>
+                      </div>
+                      {editingCategory === '__custom__' && (
+                        <div>
+                          <input
+                            type="text"
+                            value={editingCustomInput}
+                            onChange={(e) => setEditingCustomInput(e.target.value)}
+                            placeholder="Enter custom tag name (e.g. Research)"
+                            className="w-full h-8 px-3 rounded-xl border border-orange-300 bg-white text-xs text-slate-900 focus:border-[#C44900] focus:outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveEdit();
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingTaskId(null)}
+                          className="h-7 px-2.5 rounded-lg border border-slate-200 bg-white text-xs font-mono font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveEdit}
+                          disabled={!editingLabel.trim()}
+                          className="h-7 px-3 rounded-lg bg-[#C44900] text-white text-xs font-mono font-bold hover:bg-[#9E3B00] disabled:opacity-50 cursor-pointer"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={task.id}
+                    className="min-h-[48px] px-3.5 py-2.5 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 flex items-center justify-between gap-2 shadow-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="block font-sans text-sm font-semibold leading-snug truncate">
+                        {task.label}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                        {task.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startEditTask(task)}
+                        className="w-7 h-7 rounded-lg border border-slate-200 hover:border-[#C44900] hover:text-[#C44900] flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+                        title="Edit task"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTask(task)}
+                        className="w-7 h-7 rounded-lg border border-slate-200 hover:border-red-500 hover:text-red-600 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+                        title="Delete task"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {PRESET_OJT_TASKS.map((task) => {
+            {checklistItems.map((task) => {
               const active = selectedTasks.includes(task.label);
               return (
                 <button
@@ -682,6 +1148,13 @@ export default function PunchClockCard({
               );
             })}
           </div>
+        )}
+
+        <div
+          className={`space-y-4 transition-opacity ${
+            isChecklistLocked ? 'opacity-50 pointer-events-none select-none' : ''
+          }`}
+        >
 
           <div className="space-y-2">
             <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold">
@@ -705,7 +1178,6 @@ export default function PunchClockCard({
                 onClick={() => setPendingAction('format-notes')}
                 className="h-10 px-4 rounded-xl border-2 border-slate-200 bg-white hover:border-[#C44900] hover:text-[#C44900] disabled:opacity-50 disabled:cursor-not-allowed text-slate-800 font-mono text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#C44900]" />
                 Add Notes to Summary
               </button>
             </div>
@@ -715,7 +1187,6 @@ export default function PunchClockCard({
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[#C44900]" />
                 <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
                   Weekly Report &amp; Monthly Report Summary
                 </span>
@@ -897,6 +1368,17 @@ export default function PunchClockCard({
         }
         onConfirm={handleConfirmPendingAction}
         onCancel={() => setPendingAction(null)}
+      />
+
+      <ConfirmModal
+        isOpen={showReloadConfirm}
+        title="Reload Default Tasks"
+        description="Are you sure you want to restore the 8 default OJT tasks? Any custom checklist items you added will be replaced with the pre-loaded items."
+        confirmLabel="Reload Defaults"
+        cancelLabel="Cancel"
+        variant="primary"
+        onConfirm={handleReloadPreloadedTasks}
+        onCancel={() => setShowReloadConfirm(false)}
       />
     </div>
   );

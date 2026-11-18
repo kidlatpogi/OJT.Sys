@@ -2,9 +2,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarPlus, Camera, Pencil, Trash2, X } from 'lucide-react';
+import { CalendarPlus, Camera, Clock, Pencil, Trash2, X } from 'lucide-react';
 import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
+import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
+import ImageModal from '@/components/ImageModal';
 import {
   calculateShiftHours,
   formatHoursWhole,
@@ -76,24 +78,6 @@ export default function LogsTab({
     return map;
   }, [entries]);
 
-  useEffect(() => {
-    if (!lightboxPhoto) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setLightboxPhoto(null);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [lightboxPhoto]);
-
   const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
 
   const openNewModal = () => {
@@ -151,12 +135,15 @@ export default function LogsTab({
     setIsModalOpen(false);
   };
 
-  const handleConfirmedDelete = async () => {
+  const handleConfirmedDelete = async (_password: string) => {
     if (!deleteTarget) return;
     setSubmitting(true);
-    await onDeleteLog(deleteTarget.id);
-    setSubmitting(false);
-    setDeleteTarget(null);
+    try {
+      await onDeleteLog(deleteTarget.id);
+      setDeleteTarget(null);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -301,14 +288,20 @@ export default function LogsTab({
         createPortal(
           <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto shadow-2xl my-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-clash-semibold text-lg sm:text-xl font-bold text-black">
-                  {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
-                </h3>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#C44900] font-bold">
+                    <Clock className="w-3.5 h-3.5" />
+                    What did you work on?
+                  </span>
+                  <h3 className="font-clash-semibold text-lg sm:text-xl font-bold text-black mt-0.5">
+                    {editing ? 'Edit Attendance Log' : 'Add OJT Day Log'}
+                  </h3>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 cursor-pointer"
+                  className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-slate-100 text-slate-500 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -421,91 +414,28 @@ export default function LogsTab({
         onCancel={() => setEmptySummaryModalOpen(false)}
       />
 
-      <ConfirmModal
+      {/* Protected Log Deletion Modal (R8) */}
+      <ProtectedDeleteModal
         isOpen={deleteTarget !== null}
+        targetLog={deleteTarget}
+        logDate={deleteTarget?.date}
+        userEmail={profile.email}
         loading={submitting}
-        variant="danger"
-        title="Delete Attendance Log"
-        description={
-          deleteTarget
-            ? `Are you sure you want to permanently delete your attendance log for ${formatReportDate(deleteTarget.date)}? This cannot be undone.`
-            : ''
-        }
-        confirmLabel="Delete Log"
         onConfirm={handleConfirmedDelete}
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {/* Accessible Lightbox Modal Dialog via Portal */}
-      {lightboxPhoto &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lightbox-title"
-            className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-            onClick={() => setLightboxPhoto(null)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl bg-[#141313] text-white rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden"
-            >
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800 shrink-0">
-                <div className="min-w-0">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#C44900] font-bold block">
-                    {formatReportDate(lightboxPhoto.date)}
-                  </span>
-                  <h3
-                    id="lightbox-title"
-                    className="font-clash-semibold text-lg sm:text-xl font-bold text-white mt-0.5 truncate"
-                  >
-                    {lightboxPhoto.title}
-                  </h3>
-                </div>
-
-                <button
-                  type="button"
-                  aria-label="Close photo preview"
-                  onClick={() => setLightboxPhoto(null)}
-                  className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="overflow-y-auto py-3 space-y-3 flex-1 flex flex-col items-center">
-                <div className="relative w-full rounded-2xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center">
-                  <img
-                    src={lightboxPhoto.imageUrl}
-                    alt={lightboxPhoto.title}
-                    className="w-full max-h-[60vh] object-contain"
-                  />
-                </div>
-
-                {lightboxPhoto.description && (
-                  <div className="w-full p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs sm:text-sm text-slate-200 font-sans whitespace-pre-line leading-relaxed">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400 block font-bold mb-1">
-                      Activity Notes
-                    </span>
-                    {lightboxPhoto.description}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex justify-end shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setLightboxPhoto(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {/* Unified Reusable Image Modal */}
+      {lightboxPhoto && (
+        <ImageModal
+          isOpen={Boolean(lightboxPhoto)}
+          onClose={() => setLightboxPhoto(null)}
+          imageUrl={lightboxPhoto.imageUrl}
+          date={lightboxPhoto.date}
+          title={lightboxPhoto.title}
+          description={lightboxPhoto.description}
+        />
+      )}
     </div>
   );
 }

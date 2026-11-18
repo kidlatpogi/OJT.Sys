@@ -65,15 +65,23 @@ export async function compressImage(file: File): Promise<Blob> {
 /**
  * Fetch all calendar entries for a given user.
  */
-export async function fetchCalendarEntries(userId: string): Promise<CalendarEntry[]> {
+export async function fetchCalendarEntries(
+  userId: string,
+  internshipId?: string | null
+): Promise<CalendarEntry[]> {
   if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      let query = supabase
         .from('calendar_entries')
         .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+        .eq('user_id', userId);
+
+      if (internshipId) {
+        query = query.eq('internship_id', internshipId);
+      }
+
+      const { data, error } = await query.order('date', { ascending: false });
 
       if (error) {
         console.error('Error fetching calendar entries from Supabase:', error);
@@ -90,7 +98,11 @@ export async function fetchCalendarEntries(userId: string): Promise<CalendarEntr
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(DEMO_CALENDAR_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const entries: CalendarEntry[] = raw ? JSON.parse(raw) : [];
+    if (internshipId) {
+      return entries.filter((e) => e.internship_id === internshipId);
+    }
+    return entries;
   } catch {
     return [];
   }
@@ -101,17 +113,23 @@ export async function fetchCalendarEntries(userId: string): Promise<CalendarEntr
  */
 export async function fetchCalendarEntryByDate(
   userId: string,
-  date: string
+  date: string,
+  internshipId?: string | null
 ): Promise<CalendarEntry | null> {
   if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      let query = supabase
         .from('calendar_entries')
         .select('*')
         .eq('user_id', userId)
-        .eq('date', date)
-        .maybeSingle();
+        .eq('date', date);
+
+      if (internshipId) {
+        query = query.eq('internship_id', internshipId);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('Error fetching calendar entry by date:', error);
@@ -125,7 +143,7 @@ export async function fetchCalendarEntryByDate(
   }
 
   // Demo mode fallback
-  const entries = await fetchCalendarEntries(userId);
+  const entries = await fetchCalendarEntries(userId, internshipId);
   return entries.find((e) => e.date === date) || null;
 }
 
@@ -178,7 +196,8 @@ export async function saveCalendarEntry(
   date: string,
   imageUrl: string,
   description = '',
-  title = 'What did you work on?'
+  title = 'What did you work on?',
+  internshipId?: string | null
 ): Promise<CalendarEntry> {
   const trimmedDesc = description.trim();
   const trimmedTitle = title.trim() || 'What did you work on?';
@@ -187,6 +206,7 @@ export async function saveCalendarEntry(
     const supabase = createClient();
     const payload = {
       user_id: userId,
+      internship_id: internshipId || null,
       date,
       image_url: imageUrl,
       title: trimmedTitle,
@@ -211,6 +231,7 @@ export async function saveCalendarEntry(
   const newEntry: CalendarEntry = {
     id: `demo-cal-${Date.now()}`,
     user_id: userId,
+    internship_id: internshipId || null,
     date,
     image_url: imageUrl,
     title: trimmedTitle,

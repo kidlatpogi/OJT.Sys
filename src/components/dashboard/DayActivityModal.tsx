@@ -13,8 +13,11 @@ import {
   Trash2,
   Upload,
   X,
+  ZoomIn,
 } from 'lucide-react';
 import { AttendanceLog, CalendarEntry } from '@/types/ojt';
+import ImageModal from '@/components/ImageModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import { formatFullDate } from '@/lib/calendar-utils';
 import {
   deleteCalendarEntry,
@@ -26,6 +29,7 @@ export interface DayActivityModalProps {
   isOpen: boolean;
   date: string; // YYYY-MM-DD
   userId: string;
+  internshipId?: string | null;
   initialEntry?: CalendarEntry | null;
   dayLog?: AttendanceLog | null;
   onClose: () => void;
@@ -36,6 +40,7 @@ export default function DayActivityModal({
   isOpen,
   date,
   userId,
+  internshipId,
   initialEntry,
   dayLog,
   onClose,
@@ -50,6 +55,8 @@ export default function DayActivityModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,6 +73,7 @@ export default function DayActivityModal({
       setTitle(initialEntry?.title || 'What did you work on?');
       setErrorMessage(null);
       setSuccessMessage(null);
+      setShowDeleteConfirm(false);
     }
   }, [isOpen, date, initialEntry, dayLog]);
 
@@ -159,7 +167,14 @@ export default function DayActivityModal({
         return;
       }
 
-      const saved = await saveCalendarEntry(userId, date, finalImageUrl, description, title);
+      const saved = await saveCalendarEntry(
+        userId,
+        date,
+        finalImageUrl,
+        description,
+        title,
+        internshipId
+      );
       onEntryUpdated(saved);
       setSuccessMessage('Photo saved successfully!');
       setTimeout(() => {
@@ -173,21 +188,19 @@ export default function DayActivityModal({
     }
   };
 
-  // Delete entry
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to remove the photo for this day?')) {
-      return;
-    }
-
+  // Delete photo entry with confirmation
+  const handleConfirmedPhotoDelete = async () => {
     try {
       setIsDeleting(true);
       setErrorMessage(null);
       await deleteCalendarEntry(userId, date, initialEntry?.image_url);
       onEntryUpdated(null);
+      setShowDeleteConfirm(false);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete photo';
       setErrorMessage(msg);
+      setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }
@@ -195,7 +208,7 @@ export default function DayActivityModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={() => {
         if (!isUploading && !isDeleting) onClose();
       }}
@@ -205,10 +218,10 @@ export default function DayActivityModal({
         aria-modal="true"
         aria-labelledby="day-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-[#141313] text-white rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] flex flex-col overflow-hidden my-auto"
+        className="w-full max-w-lg bg-white text-slate-900 rounded-3xl p-4 sm:p-6 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] flex flex-col overflow-hidden my-auto"
       >
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 shrink-0">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200/80 shrink-0">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#C44900] font-bold">
               <CalendarDays className="w-3.5 h-3.5" />
@@ -216,7 +229,7 @@ export default function DayActivityModal({
             </span>
             <h3
               id="day-modal-title"
-              className="font-clash-semibold text-lg sm:text-xl font-bold text-white mt-0.5 truncate"
+              className="font-clash-semibold text-lg sm:text-xl font-bold text-slate-900 mt-0.5 truncate"
             >
               {formatFullDate(date)}
             </h3>
@@ -227,7 +240,7 @@ export default function DayActivityModal({
             disabled={isUploading || isDeleting}
             aria-label="Close modal"
             onClick={onClose}
-            className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer shrink-0 transition-colors"
+            className="p-2 -mr-1 -mt-1 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer shrink-0 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -237,32 +250,41 @@ export default function DayActivityModal({
         <div className="overflow-y-auto py-3 space-y-3.5 flex-1 pr-1 overscroll-contain">
           {/* Notifications */}
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-mono">
+            <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-mono">
               {errorMessage}
             </div>
           )}
           {successMessage && (
-            <div className="p-3 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs font-mono flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-400" />
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600" />
               {successMessage}
             </div>
           )}
 
           {/* Photo Section */}
           <div>
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-2">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2">
               Photo of the Day
             </label>
 
             {activeImageUrl ? (
-              <div className="relative group rounded-2xl overflow-hidden border border-slate-700 bg-black aspect-[16/10] max-h-48 sm:max-h-60 flex items-center justify-center">
+              <div className="relative group rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-900 aspect-[16/10] max-h-48 sm:max-h-60 w-full max-w-sm mx-auto flex items-center justify-center">
                 <img
                   src={activeImageUrl}
                   alt={`Activity for ${date}`}
-                  className="w-full h-full object-cover"
+                  onClick={() => setIsImageModalOpen(true)}
+                  className="w-full h-full object-cover cursor-pointer"
                 />
 
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 p-4">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 sm:gap-3 p-3 sm:p-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsImageModalOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 font-mono text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-lg transition-transform hover:scale-105"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                    View
+                  </button>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -274,7 +296,7 @@ export default function DayActivityModal({
                   {initialEntry && (
                     <button
                       type="button"
-                      onClick={handleDelete}
+                      onClick={() => setShowDeleteConfirm(true)}
                       disabled={isDeleting}
                       className="px-3.5 py-2 rounded-xl bg-red-600/90 hover:bg-red-600 text-white font-mono text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-lg transition-transform hover:scale-105"
                     >
@@ -293,17 +315,17 @@ export default function DayActivityModal({
                 className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors flex flex-col items-center justify-center gap-3 ${
                   isDragOver
                     ? 'border-[#C44900] bg-[#C44900]/10'
-                    : 'border-slate-800 hover:border-slate-600 bg-white/[0.02]'
+                    : 'border-slate-300 hover:border-slate-400 bg-slate-50/50'
                 }`}
               >
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-[#C44900] shadow-xs">
                   <Camera className="w-6 h-6 text-[#C44900]" />
                 </div>
                 <div>
-                  <p className="font-sans text-sm font-semibold text-white">
+                  <p className="font-sans text-sm font-semibold text-slate-900">
                     Drop a photo here, or browse
                   </p>
-                  <p className="font-mono text-xs text-slate-400 mt-1">
+                  <p className="font-mono text-xs text-slate-500 mt-1">
                     Supports JPEG, PNG, WebP up to 5MB
                   </p>
                 </div>
@@ -323,7 +345,7 @@ export default function DayActivityModal({
           <div>
             <label
               htmlFor="day-title-input"
-              className="block font-mono text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-2"
+              className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2"
             >
               Entry Title
             </label>
@@ -334,7 +356,7 @@ export default function DayActivityModal({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What did you work on?"
               maxLength={100}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c1c1f] border border-slate-800 focus:border-[#C44900] focus:ring-1 focus:ring-[#C44900] text-sm text-white placeholder-slate-500 font-sans outline-hidden transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50/50 border-2 border-slate-200 focus:bg-white focus:border-[#C44900] text-sm text-slate-900 placeholder-slate-400 font-sans outline-hidden transition-colors"
             />
           </div>
 
@@ -342,7 +364,7 @@ export default function DayActivityModal({
           <div>
             <label
               htmlFor="day-description-input"
-              className="block font-mono text-[11px] uppercase tracking-wider text-slate-400 font-bold mb-2"
+              className="block font-mono text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2"
             >
               Activity Notes (Optional)
             </label>
@@ -353,25 +375,25 @@ export default function DayActivityModal({
               placeholder="What did you build, learn, or experience today?"
               rows={3}
               maxLength={500}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c1c1f] border border-slate-800 focus:border-[#C44900] focus:ring-1 focus:ring-[#C44900] text-sm text-white placeholder-slate-500 font-sans outline-hidden resize-none transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50/50 border-2 border-slate-200 focus:bg-white focus:border-[#C44900] text-sm text-slate-900 placeholder-slate-400 font-sans outline-hidden resize-none transition-colors"
             />
-            <div className="text-right font-mono text-[10px] text-slate-500 mt-1">
+            <div className="text-right font-mono text-[10px] text-slate-400 mt-1">
               {description.length}/500
             </div>
           </div>
 
           {/* Correlated Punch Clock Attendance Info */}
           {dayLog && (
-            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                <span className="flex items-center gap-1.5 text-slate-500 font-semibold">
                   <Clock className="w-3.5 h-3.5 text-[#C44900]" />
                   Logged Hours:
                 </span>
-                <span className="text-white font-bold">{dayLog.hours_worked} hrs</span>
+                <span className="text-slate-900 font-bold">{dayLog.hours_worked} hrs</span>
               </div>
               {dayLog.ai_summary && (
-                <div className="text-xs font-sans text-slate-300 leading-relaxed pt-1 border-t border-white/5 line-clamp-3">
+                <div className="text-xs font-sans text-slate-600 leading-relaxed pt-1 border-t border-slate-200/80 line-clamp-3">
                   {dayLog.ai_summary}
                 </div>
               )}
@@ -380,13 +402,13 @@ export default function DayActivityModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 shrink-0 pb-1">
+        <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2 shrink-0 pb-1">
           {initialEntry && !selectedFile ? (
             <button
               type="button"
               disabled={isDeleting || isUploading}
-              onClick={handleDelete}
-              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 font-mono text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-mono text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Remove Photo
@@ -400,7 +422,7 @@ export default function DayActivityModal({
               type="button"
               disabled={isUploading || isDeleting}
               onClick={onClose}
-              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-mono text-xs font-bold cursor-pointer transition-colors"
+              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border-2 border-slate-200 hover:border-slate-400 text-slate-700 hover:text-black bg-white font-mono text-xs font-bold cursor-pointer transition-colors"
             >
               Close
             </button>
@@ -431,6 +453,31 @@ export default function DayActivityModal({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Photo Deletion */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        loading={isDeleting}
+        variant="danger"
+        title="Remove Photo of the Day"
+        description={`Are you sure you want to permanently remove the photo for ${formatFullDate(date)}? This cannot be undone.`}
+        confirmLabel="Remove Photo"
+        cancelLabel="Keep Photo"
+        onConfirm={handleConfirmedPhotoDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Unified Image Modal for fullscreen preview & zoom */}
+      {isImageModalOpen && activeImageUrl && (
+        <ImageModal
+          isOpen={isImageModalOpen}
+          onClose={() => setIsImageModalOpen(false)}
+          imageUrl={activeImageUrl}
+          date={date}
+          title={title || `Activity for ${date}`}
+          description={description || dayLog?.ai_summary || dayLog?.custom_tasks || ''}
+        />
+      )}
     </div>,
     document.body
   );

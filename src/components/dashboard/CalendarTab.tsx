@@ -6,10 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Flame,
   Image as ImageIcon,
   Loader2,
   Plus,
-  Sparkles,
 } from 'lucide-react';
 import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import {
@@ -20,10 +20,13 @@ import {
 } from '@/lib/calendar-utils';
 import { fetchCalendarEntries } from '@/lib/calendar-service';
 import DayActivityModal from '@/components/dashboard/DayActivityModal';
+import ImageModal from '@/components/ImageModal';
 
 export interface CalendarTabProps {
   profile: UserProfile;
   logs: AttendanceLog[];
+  calendarEntries?: CalendarEntry[];
+  onCalendarUpdated?: () => void;
   onSaveLog?: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
   mode?: 'supabase' | 'demo';
 }
@@ -31,27 +34,44 @@ export interface CalendarTabProps {
 export default function CalendarTab({
   profile,
   logs,
+  calendarEntries,
+  onCalendarUpdated,
 }: CalendarTabProps) {
   const today = useMemo(() => new Date(), []);
   const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
   const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(today.getMonth());
 
-  const [entries, setEntries] = useState<CalendarEntry[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [entries, setEntries] = useState<CalendarEntry[]>(calendarEntries || []);
+  const [loading, setLoading] = useState<boolean>(!calendarEntries);
   const [modalDate, setModalDate] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<{
+    imageUrl: string;
+    date: string;
+    title?: string;
+    description?: string;
+  } | null>(null);
 
-  // Load calendar entries for the current user
+  // Sync entries with calendarEntries prop when provided
+  useEffect(() => {
+    if (calendarEntries !== undefined) {
+      setEntries(calendarEntries);
+      setLoading(false);
+    }
+  }, [calendarEntries]);
+
+  // Load calendar entries for the current user and active internship if calendarEntries prop not supplied
   const loadEntries = useCallback(async () => {
+    if (calendarEntries !== undefined) return;
     try {
       setLoading(true);
-      const data = await fetchCalendarEntries(profile.id);
+      const data = await fetchCalendarEntries(profile.id, profile.active_internship_id);
       setEntries(data);
     } catch (err) {
       console.error('Failed to load calendar entries:', err);
     } finally {
       setLoading(false);
     }
-  }, [profile.id]);
+  }, [profile.id, profile.active_internship_id, calendarEntries]);
 
   useEffect(() => {
     loadEntries();
@@ -148,6 +168,7 @@ export default function CalendarTab({
     } else {
       setEntries((prev) => prev.filter((e) => e.date !== modalDate));
     }
+    onCalendarUpdated?.();
   };
 
   const todayStr = getTodayDateString();
@@ -259,6 +280,13 @@ export default function CalendarTab({
                   </>
                 ) : null}
 
+                {/* Fallback Flame icon when activity or log exists without a photo */}
+                {!hasPhoto && (entry || log) && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <Flame className="w-5 h-5 sm:w-7 sm:h-7 text-[#C44900]/70 group-hover:text-[#C44900] group-hover:scale-110 transition-all drop-shadow-[0_0_8px_rgba(196,73,0,0.3)]" />
+                  </div>
+                )}
+
                 {/* Top Row: Day Number & Attendance/Activity Dot */}
                 <div className="relative z-10 flex items-start justify-between w-full pointer-events-none">
                   <span
@@ -283,7 +311,7 @@ export default function CalendarTab({
 
                 {/* Bottom Row / Status Indicator */}
                 <div className="relative z-10 w-full pointer-events-none">
-                  {hasPhoto ? (
+                  {hasPhoto && entry ? (
                     <div className="flex items-center justify-between text-[10px] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] font-mono">
                       {log ? (
                         <span className="hidden sm:inline-block font-semibold">
@@ -292,11 +320,34 @@ export default function CalendarTab({
                       ) : (
                         <span />
                       )}
-                      <ImageIcon className="w-3 h-3 text-white/90 ml-auto" />
+                      <button
+                        type="button"
+                        aria-label={`View full photo for ${cell.date}`}
+                        title="View photo"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewImage({
+                            imageUrl: entry.image_url,
+                            date: cell.date,
+                            title: entry.title || `Activity for ${cell.date}`,
+                            description: entry.description || log?.ai_summary || log?.custom_tasks || '',
+                          });
+                        }}
+                        className="p-1 rounded-md hover:bg-black/50 text-white/90 hover:text-white transition-colors cursor-pointer pointer-events-auto ml-auto"
+                      >
+                        <ImageIcon className="w-3 h-3 text-white/90" />
+                      </button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center sm:justify-start text-slate-600 group-hover:text-slate-400 transition-colors">
-                      <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center justify-between text-slate-500 font-mono text-[10px]">
+                      {log ? (
+                        <span className="font-semibold text-slate-400">
+                          {log.hours_worked}h
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <Plus className="w-3 h-3 text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                     </div>
                   )}
                 </div>
@@ -330,10 +381,23 @@ export default function CalendarTab({
           isOpen={Boolean(modalDate)}
           date={modalDate}
           userId={profile.id}
+          internshipId={profile.active_internship_id}
           initialEntry={activeModalEntry}
           dayLog={activeModalLog}
           onClose={() => setModalDate(null)}
           onEntryUpdated={handleEntryUpdated}
+        />
+      )}
+
+      {/* Unified Image Modal */}
+      {previewImage && (
+        <ImageModal
+          isOpen={Boolean(previewImage)}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.imageUrl}
+          date={previewImage.date}
+          title={previewImage.title}
+          description={previewImage.description}
         />
       )}
     </div>
