@@ -1,5 +1,6 @@
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { CalendarEntry } from '@/types/ojt';
+import { isValidUuid } from '@/lib/internship-service';
 
 const CALENDAR_STORAGE_BUCKET = 'calendar-images';
 const DEMO_CALENDAR_KEY = 'ojt_demo_calendar_entries_v1';
@@ -69,7 +70,7 @@ export async function fetchCalendarEntries(
   userId: string,
   internshipId?: string | null
 ): Promise<CalendarEntry[]> {
-  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+  if (isSupabaseConfigured() && isValidUuid(userId)) {
     try {
       const supabase = createClient();
       let query = supabase
@@ -77,11 +78,22 @@ export async function fetchCalendarEntries(
         .select('*')
         .eq('user_id', userId);
 
-      if (internshipId) {
+      if (internshipId && isValidUuid(internshipId)) {
         query = query.eq('internship_id', internshipId);
       }
 
-      const { data, error } = await query.order('date', { ascending: false });
+      let { data, error } = await query.order('date', { ascending: false });
+
+      if (error && internshipId) {
+        console.warn('Calendar entries query with internship_id failed, falling back:', error);
+        const fallback = await supabase
+          .from('calendar_entries')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: false });
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         console.error('Error fetching calendar entries from Supabase:', error);
@@ -116,7 +128,7 @@ export async function fetchCalendarEntryByDate(
   date: string,
   internshipId?: string | null
 ): Promise<CalendarEntry | null> {
-  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+  if (isSupabaseConfigured() && isValidUuid(userId)) {
     try {
       const supabase = createClient();
       let query = supabase
@@ -125,11 +137,23 @@ export async function fetchCalendarEntryByDate(
         .eq('user_id', userId)
         .eq('date', date);
 
-      if (internshipId) {
+      if (internshipId && isValidUuid(internshipId)) {
         query = query.eq('internship_id', internshipId);
       }
 
-      const { data, error } = await query.maybeSingle();
+      let { data, error } = await query.maybeSingle();
+
+      if (error && internshipId) {
+        console.warn('Calendar single query with internship_id failed, retrying without filter:', error);
+        const fallback = await supabase
+          .from('calendar_entries')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('date', date)
+          .maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         console.error('Error fetching calendar entry by date:', error);
@@ -158,7 +182,7 @@ export async function uploadCalendarImage(
 ): Promise<string> {
   const compressedBlob = await compressImage(file);
 
-  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+  if (isSupabaseConfigured() && isValidUuid(userId)) {
     const supabase = createClient();
     const timestamp = Date.now();
     const filePath = `${userId}/${date}_${timestamp}.jpg`;
@@ -202,22 +226,36 @@ export async function saveCalendarEntry(
   const trimmedDesc = description.trim();
   const trimmedTitle = title.trim() || 'What did you work on?';
 
-  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+  if (isSupabaseConfigured() && isValidUuid(userId)) {
     const supabase = createClient();
-    const payload = {
+    const payload: Record<string, any> = {
       user_id: userId,
-      internship_id: internshipId || null,
       date,
       image_url: imageUrl,
       title: trimmedTitle,
       description: trimmedDesc,
     };
+    if (internshipId && isValidUuid(internshipId)) {
+      payload.internship_id = internshipId;
+    }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('calendar_entries')
       .upsert(payload, { onConflict: 'user_id,date' })
       .select()
       .single();
+
+    if (error && payload.internship_id) {
+      console.warn('Calendar upsert with internship_id failed, retrying without internship_id:', error);
+      delete payload.internship_id;
+      const retry = await supabase
+        .from('calendar_entries')
+        .upsert(payload, { onConflict: 'user_id,date' })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       throw new Error(`Failed to save calendar entry: ${error.message}`);
@@ -262,7 +300,7 @@ export async function deleteCalendarEntry(
   date: string,
   imageUrl?: string
 ): Promise<void> {
-  if (isSupabaseConfigured() && userId && userId !== 'demo-trainee-001') {
+  if (isSupabaseConfigured() && isValidUuid(userId)) {
     const supabase = createClient();
 
     let fileUrlToDelete = imageUrl;

@@ -5,6 +5,11 @@ const DEMO_INTERNSHIPS_KEY = 'ojt_demo_internships_v1';
 const DEMO_ACTIVE_INTERNSHIP_ID_KEY = 'ojt_demo_active_internship_id_v1';
 const DEMO_CHECKLIST_KEY_PREFIX = 'ojt_work_checklist_';
 
+export function isValidUuid(id?: string | null): boolean {
+  if (!id || typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+}
+
 export function getInitialDemoInternship(userId: string): Internship {
   return {
     id: 'demo-internship-001',
@@ -66,7 +71,7 @@ export async function fetchUserInternships(
   userId: string,
   isDemo = false
 ): Promise<Internship[]> {
-  if (isDemo || !isSupabaseConfigured()) {
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(userId)) {
     return loadDemoInternships(userId);
   }
 
@@ -78,15 +83,22 @@ export async function fetchUserInternships(
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      // Graceful fallback if table does not exist or empty
-      return loadDemoInternships(userId);
+    if (error) {
+      console.warn('Could not fetch internships from Supabase:', error);
+      // Return local cache if available, but filter out default demo mock
+      const local = loadDemoInternships(userId);
+      return local.filter((i) => i.id !== 'demo-internship-001');
+    }
+
+    if (!data || data.length === 0) {
+      // Return empty so caller can initialize real record from user profile
+      return [];
     }
 
     return data as Internship[];
   } catch (err) {
     console.error('Error fetching user internships:', err);
-    return loadDemoInternships(userId);
+    return [];
   }
 }
 
@@ -94,8 +106,13 @@ export async function createInternshipRecord(
   payload: Partial<Internship> & { user_id: string; title: string; company_name: string },
   isDemo = false
 ): Promise<Internship> {
+  const generatedId =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `internship-${Date.now()}`;
+
   const newRecord: Internship = {
-    id: payload.id || `internship-${Date.now()}`,
+    id: payload.id || generatedId,
     user_id: payload.user_id,
     title: payload.title,
     company_name: payload.company_name,
@@ -116,7 +133,7 @@ export async function createInternshipRecord(
     updated_at: new Date().toISOString(),
   };
 
-  if (isDemo || !isSupabaseConfigured()) {
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(payload.user_id)) {
     const current = loadDemoInternships(payload.user_id);
     const updated = [...current, newRecord];
     saveDemoInternships(updated);
@@ -180,7 +197,7 @@ export async function updateInternshipRecord(
   updates: Partial<Internship>,
   isDemo = false
 ): Promise<Internship | null> {
-  if (isDemo || !isSupabaseConfigured()) {
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(id)) {
     const current = loadDemoInternships(userId);
     const idx = current.findIndex((i) => i.id === id);
     if (idx === -1) return null;
@@ -219,8 +236,9 @@ export async function setActiveInternshipRecord(
   internshipId: string,
   isDemo = false
 ): Promise<void> {
-  if (isDemo || !isSupabaseConfigured()) {
-    saveDemoActiveInternshipId(internshipId);
+  saveDemoActiveInternshipId(internshipId);
+
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(internshipId) || !isValidUuid(userId)) {
     return;
   }
 
@@ -232,7 +250,6 @@ export async function setActiveInternshipRecord(
       .eq('id', userId);
   } catch (err) {
     console.error('Exception setting active internship:', err);
-    saveDemoActiveInternshipId(internshipId);
   }
 }
 
@@ -246,7 +263,7 @@ export async function saveWorkChecklist(
     localStorage.setItem(`${DEMO_CHECKLIST_KEY_PREFIX}${userId}`, JSON.stringify(checklist));
   }
 
-  if (isDemo || !isSupabaseConfigured()) {
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(userId)) {
     return;
   }
 
@@ -297,7 +314,7 @@ export async function deleteInternshipRecord(
     }
   }
 
-  if (isDemo || !isSupabaseConfigured()) {
+  if (isDemo || !isSupabaseConfigured() || !isValidUuid(internshipId) || !isValidUuid(userId)) {
     return true;
   }
 
