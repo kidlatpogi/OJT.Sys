@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, FileCheck2, RotateCcw } from 'lucide-react';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+import { isValidUuid } from '@/lib/internship-service';
 import ConfirmModal from '@/components/ConfirmModal';
 
 type ChecklistPhase = 'Preliminary' | 'Ongoing' | 'Post-Internship';
@@ -133,7 +134,7 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
         // ignore localStorage parse error
       }
 
-      if (isSupabaseConfigured()) {
+      if (isSupabaseConfigured() && isValidUuid(userId)) {
         try {
           const supabase = createClient();
 
@@ -176,7 +177,7 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
       // ignore storage quota
     }
 
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && isValidUuid(userId)) {
       try {
         const supabase = createClient();
         // Save to PostgreSQL profiles table (cross-device primary persistence)

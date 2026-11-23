@@ -17,27 +17,23 @@ import PunchClockCard from '@/components/dashboard/PunchClockCard';
 import InternshipSelector from '@/components/dashboard/InternshipSelector';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
-
-const TabSkeleton = () => (
-  <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-8 text-center font-mono text-xs text-slate-400">
-    Loading view...
-  </div>
-);
+import { DashboardSkeleton, TabContentSkeleton } from '@/components/dashboard/DashboardSkeleton';
+import WhatsNewBanner from '@/components/WhatsNewBanner';
 
 const CalendarTab = dynamic(() => import('@/components/dashboard/CalendarTab'), {
-  loading: TabSkeleton,
+  loading: () => <TabContentSkeleton label="Calendar" />,
 });
 const LogsTab = dynamic(() => import('@/components/dashboard/LogsTab'), {
-  loading: TabSkeleton,
+  loading: () => <TabContentSkeleton label="Logs" />,
 });
 const ReportsTab = dynamic(() => import('@/components/dashboard/ReportsTab'), {
-  loading: TabSkeleton,
+  loading: () => <TabContentSkeleton label="Reports" />,
 });
 const ChecklistTab = dynamic(() => import('@/components/dashboard/ChecklistTab'), {
-  loading: TabSkeleton,
+  loading: () => <TabContentSkeleton label="Checklist" />,
 });
 const ProfileTab = dynamic(() => import('@/components/dashboard/ProfileTab'), {
-  loading: TabSkeleton,
+  loading: () => <TabContentSkeleton label="Profile" />,
 });
 const InternshipSetupModal = dynamic(
   () => import('@/components/dashboard/InternshipSetupModal')
@@ -59,6 +55,7 @@ import {
   deleteInternshipRecord,
   fetchUserInternships,
   getInitialDemoInternship,
+  isValidUuid,
   loadDemoActiveInternshipId,
   loadDemoInternships,
   loadLocalWorkChecklist,
@@ -66,7 +63,7 @@ import {
   setActiveInternshipRecord,
   updateInternshipRecord,
 } from '@/lib/internship-service';
-import { formatHoursWhole, getTodayDateString } from '@/lib/ojt-calculations';
+import { calculateShiftHours, formatHoursWhole, getTodayDateString } from '@/lib/ojt-calculations';
 
 type TabKey = 'clock' | 'calendar' | 'logs' | 'reports' | 'checklist' | 'profile';
 
@@ -287,19 +284,41 @@ export default function DashboardPage() {
     });
   }, [calendarEntries, activeInternshipId, internships]);
 
-  const totalHoursServed = useMemo(
-    () => activeLogs.reduce((acc, item) => acc + Math.round(Number(item.hours_worked) || 0), 0),
-    [activeLogs]
-  );
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
-  const progressPct = Math.min(
-    100,
-    Math.round((totalHoursServed / Math.max(1, effectiveProfile.target_hours || 500)) * 100)
-  );
+  useEffect(() => {
+    setCurrentTime(new Date());
+    // Live ticker every 30 seconds to keep in-progress hours dynamically updated
+    const interval = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const todayLog = useMemo(
     () => activeLogs.find((l) => l.date === getTodayDateString()) || null,
     [activeLogs]
+  );
+
+  // Dynamic in-progress hours for current shift while timed in
+  const liveInProgressHours = useMemo(() => {
+    if (!todayLog?.time_in || todayLog?.time_out || !currentTime) return 0;
+    return calculateShiftHours(
+      todayLog.time_in,
+      currentTime.toISOString(),
+      effectiveProfile.lunch_break_minutes
+    );
+  }, [todayLog?.time_in, todayLog?.time_out, currentTime, effectiveProfile.lunch_break_minutes]);
+
+  const totalHoursServed = useMemo(() => {
+    const completedHours = activeLogs.reduce((acc, item) => {
+      // If item is todayLog without time_out, item.hours_worked is 0
+      return acc + Math.round(Number(item.hours_worked) || 0);
+    }, 0);
+    return completedHours + liveInProgressHours;
+  }, [activeLogs, liveInProgressHours]);
+
+  const progressPct = Math.min(
+    100,
+    Math.round((totalHoursServed / Math.max(1, effectiveProfile.target_hours || 500)) * 100)
   );
 
   const isCurrentInternshipIncomplete = useMemo(() => {
@@ -317,9 +336,11 @@ export default function DashboardPage() {
         if (l.internship_id) return l.internship_id === internshipId;
         return firstInternship ? firstInternship.id === internshipId : false;
       });
-      return matched.reduce((acc, item) => acc + Math.round(Number(item.hours_worked) || 0), 0);
+      const completed = matched.reduce((acc, item) => acc + Math.round(Number(item.hours_worked) || 0), 0);
+      const isCurrentlyActive = (activeInternship?.id === internshipId) || (activeInternshipId === internshipId);
+      return completed + (isCurrentlyActive ? liveInProgressHours : 0);
     },
-    [internships, logs]
+    [internships, logs, activeInternship?.id, activeInternshipId, liveInProgressHours]
   );
 
   const needsOnboarding =
@@ -467,12 +488,12 @@ export default function DashboardPage() {
     payload: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }
   ) => {
     const currentInternshipId = activeInternship?.id || activeInternshipId || null;
+    const validInternshipUuid = isValidUuid(currentInternshipId) ? currentInternshipId : null;
 
     if (mode === 'supabase') {
       const supabase = createClient();
-      const record = {
+      const baseRecord: Record<string, any> = {
         user_id: profile.id,
-        internship_id: currentInternshipId,
         date: payload.date,
         time_in: payload.time_in,
         time_out: payload.time_out,
@@ -483,13 +504,54 @@ export default function DashboardPage() {
         ai_provider: payload.ai_provider || 'manual',
       };
 
-      const { data, error } = await supabase
+      const record: Record<string, any> = { ...baseRecord };
+      if (validInternshipUuid) {
+        record.internship_id = validInternshipUuid;
+      }
+
+      let { data, error } = await supabase
         .from('attendance_logs')
         .upsert(record, { onConflict: 'user_id,date' })
         .select()
         .single();
 
-      if (!error && data) {
+      // If upsert failed with internship_id, retry without internship_id
+      if (error && record.internship_id) {
+        console.warn('Upsert attendance log with internship_id failed, retrying without internship_id:', error);
+        const retry = await supabase
+          .from('attendance_logs')
+          .upsert(baseRecord, { onConflict: 'user_id,date' })
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
+
+      if (error) {
+        console.error('Error saving attendance log to Supabase:', error);
+        // Resilient fallback to local state so user's time-in is NEVER blocked
+        const fallbackLog: AttendanceLog = {
+          id: payload.id || `local-log-${Date.now()}`,
+          user_id: profile.id,
+          internship_id: currentInternshipId,
+          date: payload.date,
+          time_in: payload.time_in,
+          time_out: payload.time_out,
+          hours_worked: payload.hours_worked,
+          tasks_selected: payload.tasks_selected,
+          custom_tasks: payload.custom_tasks,
+          ai_summary: payload.ai_summary,
+          ai_provider: payload.ai_provider,
+        };
+        setLogs((prev) => {
+          const filtered = prev.filter((l) => l.date !== payload.date);
+          return [fallbackLog, ...filtered];
+        });
+        refreshCalendarEntries();
+        return;
+      }
+
+      if (data) {
         setLogs((prev) => {
           const filtered = prev.filter((l) => l.date !== data.date);
           return [data as AttendanceLog, ...filtered];
@@ -535,8 +597,10 @@ export default function DashboardPage() {
     }
 
     if (mode === 'supabase') {
-      const supabase = createClient();
-      await supabase.from('attendance_logs').delete().eq('id', id);
+      if (isValidUuid(id)) {
+        const supabase = createClient();
+        await supabase.from('attendance_logs').delete().eq('id', id);
+      }
       setLogs((prev) => prev.filter((l) => l.id !== id));
       return;
     }
@@ -602,9 +666,9 @@ export default function DashboardPage() {
       setActiveInternshipId(created.id);
     }
 
-    if (mode === 'supabase') {
+    if (mode === 'supabase' && isValidUuid(updated.id)) {
       const supabase = createClient();
-      const baseRecord = {
+      const baseRecord: Record<string, any> = {
         id: updated.id,
         full_name: updated.full_name,
         student_id: updated.student_id,
@@ -620,15 +684,24 @@ export default function DashboardPage() {
         daily_end_time: updated.daily_end_time,
         lunch_break_minutes: updated.lunch_break_minutes,
         academic_term: updated.academic_term,
-        active_internship_id: activeInternshipId || updated.active_internship_id || null,
       };
-      const { error } = await supabase.from('profiles').upsert({
+
+      const targetInternshipId = activeInternshipId || updated.active_internship_id;
+      if (targetInternshipId && isValidUuid(targetInternshipId)) {
+        baseRecord.active_internship_id = targetInternshipId;
+      }
+
+      let { error } = await supabase.from('profiles').upsert({
         ...baseRecord,
         auto_time_out: updated.auto_time_out !== false,
       });
+
       if (error) {
-        // Fallback if auto_time_out or active_internship_id column has not been added yet
-        await supabase.from('profiles').upsert(baseRecord);
+        // Fallback: strip optional columns if schema migration hasn't been applied yet
+        const safeRecord = { ...baseRecord };
+        delete safeRecord.active_internship_id;
+        delete safeRecord.auto_time_out;
+        await supabase.from('profiles').upsert(safeRecord);
       }
       return;
     }
@@ -719,6 +792,9 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Announcement / What's New Banner (dismissable, 1-time display) */}
+        <WhatsNewBanner className="mb-2" />
+
         {/* Compact Cumulative OJT Hours Progress Strip */}
         <section className="no-print bg-white border-2 border-slate-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-5">
           <div className="flex items-center justify-between gap-2">
@@ -737,9 +813,17 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <span className="font-mono text-[11px] px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 font-semibold shrink-0">
-              {Math.max(0, effectiveProfile.target_hours - totalHoursServed)}h left
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {todayLog?.time_in && !todayLog?.time_out && liveInProgressHours > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  +{liveInProgressHours}h active
+                </span>
+              )}
+              <span className="font-mono text-[11px] px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 font-semibold shrink-0">
+                {Math.max(0, effectiveProfile.target_hours - totalHoursServed)}h left
+              </span>
+            </div>
           </div>
 
           <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mt-3">
@@ -751,9 +835,7 @@ export default function DashboardPage() {
         </section>
 
         {loading ? (
-          <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-8 text-center font-mono text-xs text-slate-500">
-            Loading OJT Workspace...
-          </div>
+          <DashboardSkeleton />
         ) : (
           <>
             <div className={activeTab === 'clock' ? 'block' : 'hidden'}>

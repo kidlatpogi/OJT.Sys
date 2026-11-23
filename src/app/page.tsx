@@ -1,3 +1,6 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -13,6 +16,7 @@ import {
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
 import LandingNavActions from '@/components/LandingNavActions';
+import WhatsNewBanner from '@/components/WhatsNewBanner';
 
 const reportCards = [
   {
@@ -36,6 +40,25 @@ const reportCards = [
 ];
 
 export default function LandingPage() {
+  const [hasDownloaded, setHasDownloaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      setHasDownloaded(localStorage.getItem('ojt_apk_downloaded') === 'true');
+    } catch {
+      // Ignore in restricted environments
+    }
+  }, []);
+
+  const handleDownloadClick = () => {
+    try {
+      localStorage.setItem('ojt_apk_downloaded', 'true');
+      setHasDownloaded(true);
+    } catch {
+      // Ignore
+    }
+  };
+
   return (
     <div className="relative min-h-[100dvh] flex flex-col justify-between overflow-x-clip">
       <ShapeGrid />
@@ -50,7 +73,10 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-16">
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-16">
+        {/* One-time What's New Announcement Banner */}
+        <WhatsNewBanner className="mb-6 sm:mb-8" />
+
         <div className="max-w-3xl">
           <h1 className="font-clash-semibold text-[2.5rem] leading-[0.95] sm:text-6xl md:text-7xl font-bold tracking-tighter text-black">
             Track Daily OJT.
@@ -88,10 +114,11 @@ export default function LandingPage() {
             <a
               href="/downloads/ojt-sys.apk"
               download="ojt-sys.apk"
+              onClick={handleDownloadClick}
               className="sm:col-span-2 h-12 px-6 rounded-2xl bg-[#141313] hover:bg-slate-800 text-white font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2 transition-all shadow-sm"
             >
               <Download className="w-4 h-4 text-[#C44900] shrink-0" />
-              Download Android App (.apk)
+              {hasDownloaded ? 'Update Android App (.apk)' : 'Download Android App (.apk)'}
             </a>
           </div>
         </div>
@@ -189,10 +216,10 @@ export default function LandingPage() {
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#C44900] font-mono text-[11px] font-bold uppercase tracking-wider">
               <Smartphone className="w-3.5 h-3.5" />
-              Android App • Capacitor
+              {hasDownloaded ? 'Update Available • v1.2.0' : 'Android App • Capacitor'}
             </div>
             <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-3">
-              Install OJT.SYS on Your Android Device
+              {hasDownloaded ? 'Update OJT.SYS on Your Android Device' : 'Install OJT.SYS on Your Android Device'}
             </h2>
             <p className="text-sm text-slate-600 mt-2 leading-relaxed">
               Get the dedicated Android APK for quick home-screen access to your daily Time-In/Time-Out punch clock, engineering task checklist, and 1:1 report exports.
@@ -206,10 +233,11 @@ export default function LandingPage() {
             <a
               href="/downloads/ojt-sys.apk"
               download="ojt-sys.apk"
+              onClick={handleDownloadClick}
               className="h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-sm sm:text-base tracking-tight whitespace-nowrap inline-flex items-center justify-center gap-2.5 transition-all shadow-[0_12px_28px_-8px_rgba(196,73,0,0.4)] active:scale-[0.99]"
             >
               <Download className="w-4 h-4 shrink-0" />
-              Download for Android (.apk)
+              {hasDownloaded ? 'Download Update (.apk)' : 'Download for Android (.apk)'}
             </a>
             <span className="font-mono text-[11px] text-slate-500 text-center md:text-right">
               v1.2.0 • Android 7.0+ (APK)

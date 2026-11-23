@@ -222,6 +222,14 @@ export default function PunchClockCard({
   const isTimedOut = Boolean(todayLog?.time_out);
   const isChecklistLocked = !isTimedIn || isTimedOut;
 
+  const liveNetHours = useMemo(() => {
+    if (todayLog?.hours_worked) return todayLog.hours_worked;
+    if (isTimedIn && !isTimedOut && todayLog?.time_in && now) {
+      return calculateShiftHours(todayLog.time_in, now.toISOString(), profile.lunch_break_minutes);
+    }
+    return 0;
+  }, [todayLog?.hours_worked, todayLog?.time_in, isTimedIn, isTimedOut, now, profile.lunch_break_minutes]);
+
   // Check if today already has a calendar entry
   useEffect(() => {
     if (!profile.id) return;
@@ -790,7 +798,7 @@ export default function PunchClockCard({
           <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
             <span className="block font-mono text-[10px] uppercase text-slate-400">Net Hours</span>
             <span className="font-mono text-xs sm:text-base font-bold text-[#C44900] mt-0.5 block">
-              {todayLog?.hours_worked ? formatHoursWhole(todayLog.hours_worked) : '0h'}
+              {liveNetHours ? formatHoursWhole(liveNetHours) : '0h'}
             </span>
           </div>
         </div>
