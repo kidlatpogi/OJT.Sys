@@ -98,6 +98,21 @@ export default function DashboardPage() {
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'supabase' | 'demo'>('demo');
+  const [navLayout, setNavLayout] = useState<'top' | 'rail'>('top');
+
+  useEffect(() => {
+    const updateLayout = () => {
+      try {
+        const stored = localStorage.getItem('ojt_nav_layout');
+        setNavLayout(stored === 'rail' ? 'rail' : 'top');
+      } catch {
+        setNavLayout('top');
+      }
+    };
+    updateLayout();
+    window.addEventListener('ojt_nav_layout_change', updateLayout);
+    return () => window.removeEventListener('ojt_nav_layout_change', updateLayout);
+  }, []);
 
   // Offline-first sync states
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -865,65 +880,132 @@ export default function DashboardPage() {
   }, [mode, router]);
 
   return (
-    <div className="relative min-h-[100dvh] pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+    <div
+      className={`relative min-h-[100dvh] pb-36 sm:pb-12 lg:pb-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] lg:pb-6 ${
+        navLayout === 'rail' ? 'lg:flex' : ''
+      }`}
+    >
       <div className="no-print">
         <ShapeGrid />
       </div>
 
-      {/* Top Sticky Header (hidden on mobile preview / Capacitor APK view per R1) */}
-      <header className="no-print hidden sm:block sticky top-0 z-30 bg-[#f8f8f8]/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 safe-top">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
-            {internships.length > 0 && (
-              <div className="hidden sm:flex items-center border-l border-slate-200 pl-3">
-                <InternshipSelector
-                  internships={internships}
-                  activeInternshipId={activeInternshipId}
-                  onSelectInternship={handleSelectInternship}
-                  onAddNewInternship={handleRequestAddInternship}
-                  onEditInternship={(i) => setEditingInternship(i)}
-                  onDeleteInternship={(i) => setDeletingInternship(i)}
-                  getInternshipHours={getInternshipHours}
-                  variant="header"
-                />
-              </div>
-            )}
+      {/* Desktop Left Side Navigation Rail */}
+      {navLayout === 'rail' && (
+        <aside className="no-print hidden lg:flex flex-col w-20 xl:w-56 shrink-0 bg-white/95 backdrop-blur-md border-r border-slate-200/90 sticky top-0 h-screen p-3.5 justify-between z-30 select-none shadow-xs">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 px-2 py-1">
+              <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
+              <span className="hidden xl:inline font-clash-semibold text-lg font-bold tracking-tight">
+                OJT.SYS
+              </span>
+            </div>
+
+            <nav className="space-y-1.5" aria-label="Side rail navigation">
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeTab === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveTab(item.key)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl font-mono text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#C44900] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-black hover:bg-slate-100'
+                    }`}
+                    title={item.label}
+                  >
+                    <span className="shrink-0">{item.icon}</span>
+                    <span className="hidden xl:inline truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
 
-          {/* Desktop Navigation Pills */}
-          <div className="hidden sm:flex items-center gap-3">
+          {/* Bottom rail user info / status */}
+          <div className="pt-3 border-t border-slate-100 space-y-2">
             {!isOnline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold">
-                <WifiOff className="w-3 h-3 text-amber-600" />
-                <span>Offline</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold w-full justify-center xl:justify-start">
+                <WifiOff className="w-3 h-3 text-amber-600 shrink-0" />
+                <span className="hidden xl:inline">Offline</span>
               </span>
             ) : isSyncing ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold">
-                <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
-                <span>Syncing...</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold w-full justify-center xl:justify-start">
+                <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />
+                <span className="hidden xl:inline">Syncing...</span>
               </span>
             ) : null}
 
-            <nav className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-xs">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveTab(item.key)}
-                  className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
-                    activeTab === item.key
-                      ? 'bg-[#C44900] text-white'
-                      : 'text-slate-600 hover:text-black'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
+            <div className="hidden xl:block px-2">
+              <span className="text-[10px] font-mono text-slate-400 block truncate">
+                {effectiveProfile.full_name}
+              </span>
+            </div>
           </div>
-        </div>
-      </header>
+        </aside>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0">
+        {/* Top Sticky Header (hidden on mobile preview / Capacitor APK view per R1) */}
+        <header className="no-print hidden sm:block sticky top-0 z-30 bg-[#f8f8f8]/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 safe-top">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {navLayout === 'top' && (
+                <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
+              )}
+              {internships.length > 0 && (
+                <div className={`hidden sm:flex items-center ${navLayout === 'top' ? 'border-l border-slate-200 pl-3' : ''}`}>
+                  <InternshipSelector
+                    internships={internships}
+                    activeInternshipId={activeInternshipId}
+                    onSelectInternship={handleSelectInternship}
+                    onAddNewInternship={handleRequestAddInternship}
+                    onEditInternship={(i) => setEditingInternship(i)}
+                    onDeleteInternship={(i) => setDeletingInternship(i)}
+                    getInternshipHours={getInternshipHours}
+                    variant="header"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Navigation Pills (shown when top nav layout is selected) */}
+            {navLayout === 'top' && (
+              <div className="hidden sm:flex items-center gap-3">
+                {!isOnline ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold">
+                    <WifiOff className="w-3 h-3 text-amber-600" />
+                    <span>Offline</span>
+                  </span>
+                ) : isSyncing ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold">
+                    <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+                    <span>Syncing...</span>
+                  </span>
+                ) : null}
+
+                <nav className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-xs">
+                  {NAV_ITEMS.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveTab(item.key)}
+                      className={`px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        activeTab === item.key
+                          ? 'bg-[#C44900] text-white'
+                          : 'text-slate-600 hover:text-black'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            )}
+          </div>
+        </header>
 
       {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-6 space-y-5">
@@ -1134,6 +1216,7 @@ export default function DashboardPage() {
         onConfirm={handleConfirmedDeleteInternship}
         onCancel={() => setDeletingInternship(null)}
       />
+      </div>
 
       {/* Mobile Sticky Bottom Tab Bar */}
       <nav

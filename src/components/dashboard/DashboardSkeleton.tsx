@@ -34,12 +34,17 @@ export function DashboardSkeleton() {
             </div>
           </div>
 
-          <div className="hidden lg:block bg-white border-2 border-slate-200/80 rounded-3xl p-5 space-y-3">
+          <div className="hidden lg:block bg-white border-2 border-slate-200/80 rounded-3xl p-5 space-y-3 shadow-xs">
             <div className="h-3 w-28 bg-gray-200 rounded" />
             <div className="grid grid-cols-2 gap-2">
               <div className="h-12 bg-gray-100 rounded-xl" />
               <div className="h-12 bg-gray-100 rounded-xl" />
             </div>
+          </div>
+
+          <div className="hidden lg:block bg-white border-2 border-slate-200/80 rounded-3xl p-5 space-y-3 shadow-xs">
+            <div className="h-3 w-36 bg-gray-200 rounded" />
+            <div className="h-28 bg-gray-100 rounded-2xl" />
           </div>
         </div>
 

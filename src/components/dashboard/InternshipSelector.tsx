@@ -94,8 +94,9 @@ export default function InternshipSelector({
                   Done
                 </span>
               ) : (
-                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-orange-100 text-[#C44900] shrink-0">
-                  Active
+                <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Active Program">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C44900] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white" />
                 </span>
               )}
             </div>
@@ -178,8 +179,9 @@ export default function InternshipSelector({
                             Completed
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-600 shrink-0">
-                            Active
+                          <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Active Program">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C44900] opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white" />
                           </span>
                         )}
                       </div>

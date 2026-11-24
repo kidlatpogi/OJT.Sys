@@ -387,7 +387,7 @@ const CalendarTab = React.memo(function CalendarTab({
   };
 
   return (
-    <div className="space-y-4 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+    <div className="space-y-4 pb-36 sm:pb-36 lg:pb-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] lg:pb-6">
       {/* Responsive Grid: Left 8 cols on desktop for Calendar, Right 4 cols for Desktop Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left (8 cols): Dark Hero Monthly Calendar */}
@@ -565,19 +565,24 @@ const CalendarTab = React.memo(function CalendarTab({
                 </div>
 
                 {/* Dynamic Checklist Tasks for Selected Date */}
-                <div className="space-y-2 pt-2 border-t border-slate-200/70">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                      What did you work on?
-                    </span>
+                <div className="space-y-3 pt-3 border-t border-slate-200/70">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155] block">
+                        Daily Task Checklist
+                      </span>
+                      <h4 className="font-clash-semibold text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+                        What did you work on?
+                      </h4>
+                    </div>
                     {inspectedTasksSelected.length > 0 && (
-                      <span className="font-mono text-[10px] text-[#C44900] font-bold">
+                      <span className="font-mono text-[10px] font-bold text-[#C44900] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200 shrink-0">
                         {inspectedTasksSelected.length} completed
                       </span>
                     )}
                   </div>
 
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5 max-h-64 overflow-y-auto no-scrollbar pr-1">
                     {allInspectorTasks.map((task) => {
                       const isChecked = inspectedTasksSelected.includes(task.label);
                       return (
@@ -585,26 +590,28 @@ const CalendarTab = React.memo(function CalendarTab({
                           key={task.id}
                           type="button"
                           onClick={() => handleToggleInspectorTask(task.label)}
-                          className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between gap-2 transition-all cursor-pointer border ${
+                          className={`min-h-[48px] px-3.5 py-2.5 rounded-2xl border-2 text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
                             isChecked
-                              ? 'bg-orange-50/80 border-[#C44900]/40 text-slate-900 font-medium'
-                              : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200'
+                              ? "border-[#C44900] bg-[#C44900]/8 text-slate-900 font-semibold"
+                              : "border-slate-200/90 bg-white text-slate-700 hover:border-slate-300"
                           }`}
                         >
-                          <div className="min-w-0 flex-1 truncate">
-                            <span className="block truncate">{task.label}</span>
-                            <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
+                          <div className="min-w-0 flex-1">
+                            <span className="block font-sans text-sm font-semibold leading-snug truncate">
+                              {task.label}
+                            </span>
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
                               {task.category}
                             </span>
                           </div>
                           <span
-                            className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 border transition-colors ${
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                               isChecked
-                                ? 'bg-[#C44900] border-[#C44900] text-white'
-                                : 'border-slate-300 bg-white'
+                                ? "bg-[#C44900] text-white"
+                                : "bg-white border border-slate-300"
                             }`}
                           >
-                            {isChecked && <Check className="w-3 h-3" />}
+                            {isChecked && <Check className="w-3.5 h-3.5" />}
                           </span>
                         </button>
                       );

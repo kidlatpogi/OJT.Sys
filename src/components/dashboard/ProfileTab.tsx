@@ -36,10 +36,32 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
   });
   const [autoTimeOut, setAutoTimeOut] = useState(profile.auto_time_out !== false);
   const [offlineSync, setOfflineSync] = useState(profile.offline_sync !== false);
+  const [sideRailNav, setSideRailNav] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    try {
+      setSideRailNav(localStorage.getItem('ojt_nav_layout') === 'rail');
+    } catch {
+      setSideRailNav(false);
+    }
+  }, []);
+
+  const handleToggleSideRail = () => {
+    setSideRailNav((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('ojt_nav_layout', next ? 'rail' : 'top');
+        window.dispatchEvent(new Event('ojt_nav_layout_change'));
+      } catch (err) {
+        console.warn('Failed to save nav layout preference:', err);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const { firstName, lastName } = splitFullName(profile.full_name);
@@ -91,7 +113,7 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
   };
 
   return (
-    <div className="space-y-6 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+    <div className="space-y-6 pb-36 sm:pb-36 lg:pb-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] lg:pb-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -243,6 +265,69 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
                     offlineSync ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Toggle Switch Row 3: Desktop Side Railway Navigation */}
+          <div className="flex items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 hover:border-slate-300 transition-colors">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="font-sans text-sm font-bold text-slate-900">
+                  Desktop Side Railway Navigation
+                </span>
+
+                {/* Active / Disabled badge */}
+                <span
+                  className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    sideRailNav
+                      ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
+                      : 'bg-red-50 text-red-600 border border-red-200'
+                  }`}
+                >
+                  {sideRailNav ? 'Active' : 'Disabled'}
+                </span>
+
+                {/* Info "i" Hover Tooltip */}
+                <div className="relative group inline-flex items-center">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    aria-label="What is Desktop Side Railway Navigation?"
+                    title="Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking."
+                    className="w-5 h-5 rounded-full border border-slate-300 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-500 flex items-center justify-center font-mono text-[11px] font-bold cursor-help transition-colors"
+                  >
+                    i
+                  </button>
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[85vw] p-2.5 bg-slate-900 text-white rounded-xl shadow-xl font-mono text-[10.5px] leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                    Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                </div>
+              </div>
+              <p className="font-mono text-[11px] text-slate-500">
+                Display navigation menu as a vertical side rail along the left side of the screen on desktop viewports.
+              </p>
+            </div>
+
+            {/* Toggle Switch Button */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={sideRailNav}
+                aria-label="Desktop Side Railway Navigation"
+                onClick={handleToggleSideRail}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
+                  sideRailNav ? 'bg-[#C44900]' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    sideRailNav ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

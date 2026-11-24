@@ -115,7 +115,7 @@ export default function WhatsNewModal({
         aria-modal="true"
         aria-labelledby="whats-new-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-7 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[90dvh] overflow-y-auto my-auto space-y-5 animate-in fade-in-0 zoom-in-95 duration-200"
+        className="w-full max-w-3xl bg-white rounded-3xl p-5 sm:p-7 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] overflow-y-auto no-scrollbar my-auto space-y-5 animate-in fade-in-0 zoom-in-95 duration-200"
       >
         {/* Top Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
@@ -148,14 +148,14 @@ export default function WhatsNewModal({
           </button>
         </div>
 
-        {/* Highlight Items Grid */}
-        <div className="space-y-3">
+        {/* Highlight Items Multi-Column Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {CHANGELOG_ITEMS.map((item) => {
             const ItemIcon = ICON_MAP[item.iconName] || Sparkles;
             return (
               <div
                 key={item.id}
-                className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 hover:border-orange-200 transition-colors"
+                className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 hover:border-orange-200 transition-colors shadow-2xs h-full"
               >
                 <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#C44900] flex items-center justify-center shrink-0 mt-0.5">
                   <ItemIcon className="w-4 h-4" />
