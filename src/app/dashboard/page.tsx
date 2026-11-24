@@ -485,13 +485,22 @@ export default function DashboardPage() {
   };
 
   const handleSaveLog = async (
-    payload: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }
+    payload: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string; originalDate?: string }
   ) => {
     const currentInternshipId = activeInternship?.id || activeInternshipId || null;
     const validInternshipUuid = isValidUuid(currentInternshipId) ? currentInternshipId : null;
 
     if (mode === 'supabase') {
       const supabase = createClient();
+
+      // If user changed the date of an existing log, clean up the prior date record
+      if (payload.originalDate && payload.originalDate !== payload.date) {
+        await supabase
+          .from('attendance_logs')
+          .delete()
+          .match({ user_id: profile.id, date: payload.originalDate });
+      }
+
       const baseRecord: Record<string, any> = {
         user_id: profile.id,
         date: payload.date,
@@ -529,7 +538,7 @@ export default function DashboardPage() {
 
       if (error) {
         console.error('Error saving attendance log to Supabase:', error);
-        // Resilient fallback to local state so user's time-in is NEVER blocked
+        // Resilient fallback to local state and localStorage so user's work is NEVER lost
         const fallbackLog: AttendanceLog = {
           id: payload.id || `local-log-${Date.now()}`,
           user_id: profile.id,
@@ -544,8 +553,12 @@ export default function DashboardPage() {
           ai_provider: payload.ai_provider,
         };
         setLogs((prev) => {
-          const filtered = prev.filter((l) => l.date !== payload.date);
-          return [fallbackLog, ...filtered];
+          const filtered = prev.filter(
+            (l) => l.date !== payload.date && (!payload.originalDate || l.date !== payload.originalDate)
+          );
+          const updated = [fallbackLog, ...filtered];
+          saveDemoLogs(updated);
+          return updated;
         });
         refreshCalendarEntries();
         return;
@@ -553,8 +566,12 @@ export default function DashboardPage() {
 
       if (data) {
         setLogs((prev) => {
-          const filtered = prev.filter((l) => l.date !== data.date);
-          return [data as AttendanceLog, ...filtered];
+          const filtered = prev.filter(
+            (l) => l.date !== data.date && (!payload.originalDate || l.date !== payload.originalDate)
+          );
+          const updated = [data as AttendanceLog, ...filtered];
+          saveDemoLogs(updated);
+          return updated;
         });
         refreshCalendarEntries();
       }
@@ -563,7 +580,9 @@ export default function DashboardPage() {
 
     // Demo persistence
     setLogs((prev) => {
-      const existing = prev.find((l) => l.id === payload.id || l.date === payload.date);
+      const existing = prev.find(
+        (l) => l.id === payload.id || l.date === payload.date || (payload.originalDate && l.date === payload.originalDate)
+      );
       const nextLog: AttendanceLog = {
         id: existing?.id || `log-${Date.now()}`,
         user_id: profile.id,
@@ -577,7 +596,15 @@ export default function DashboardPage() {
         ai_summary: payload.ai_summary,
         ai_provider: payload.ai_provider,
       };
-      const updated = [nextLog, ...prev.filter((l) => l.date !== payload.date && l.id !== existing?.id)];
+      const updated = [
+        nextLog,
+        ...prev.filter(
+          (l) =>
+            l.date !== payload.date &&
+            l.id !== existing?.id &&
+            (!payload.originalDate || l.date !== payload.originalDate)
+        ),
+      ];
       saveDemoLogs(updated);
       return updated;
     });
@@ -597,11 +624,17 @@ export default function DashboardPage() {
     }
 
     if (mode === 'supabase') {
+      const supabase = createClient();
       if (isValidUuid(id)) {
-        const supabase = createClient();
         await supabase.from('attendance_logs').delete().eq('id', id);
+      } else if (targetLog?.date && profile.id) {
+        await supabase.from('attendance_logs').delete().match({ user_id: profile.id, date: targetLog.date });
       }
-      setLogs((prev) => prev.filter((l) => l.id !== id));
+      setLogs((prev) => {
+        const updated = prev.filter((l) => l.id !== id && l.date !== targetLog?.date);
+        saveDemoLogs(updated);
+        return updated;
+      });
       return;
     }
 

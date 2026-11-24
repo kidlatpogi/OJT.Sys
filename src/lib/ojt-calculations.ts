@@ -1,4 +1,4 @@
-import { AttendanceLog } from '@/types/ojt';
+import type { AttendanceLog } from '../types/ojt';
 
 /**
  * Computes net working hours between two ISO timestamps,
@@ -31,8 +31,47 @@ export function formatHoursWhole(hours: number): string {
 
 export const formatWholeHours = formatHoursWhole;
 
+/**
+ * Converts local date (YYYY-MM-DD) and 24h time (HH:MM) to a standard UTC ISO 8601 string.
+ * Optionally rolls to the next day for overnight shifts.
+ */
+export function formatLocalToIso(dateStr: string, timeStr: string, isNextDay = false): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = (timeStr || '00:00').split(':').map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0);
+  if (isNextDay) {
+    dt.setDate(dt.getDate() + 1);
+  }
+  return dt.toISOString();
+}
+
+/**
+ * Extracts 24h 'HH:MM' in the user's local timezone from an ISO string, naive string, or raw time.
+ */
+export function isoToLocalHHMM(iso: string | null, fallback = '08:00'): string {
+  if (!iso) return fallback;
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(iso)) {
+    const [h, m] = iso.split(':');
+    return `${h.padStart(2, '0')}:${m.slice(0, 2)}`;
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    const match = iso.match(/T(\d{2}:\d{2})/);
+    return match ? match[1] : fallback;
+  }
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export function formatTimeDisplay(isoOrTime: string | null): string {
   if (!isoOrTime) return '--:--';
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(isoOrTime)) {
+    const [hStr, mStr] = isoOrTime.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+  }
   const d = new Date(isoOrTime);
   if (Number.isNaN(d.getTime())) return isoOrTime;
   return d.toLocaleTimeString('en-US', {
