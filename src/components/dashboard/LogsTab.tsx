@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarPlus, Camera, Clock, Pencil, Trash2, X } from 'lucide-react';
+import { AlertCircle, CalendarPlus, Camera, Clock, Moon, Pencil, Trash2, X } from 'lucide-react';
 import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
@@ -10,9 +10,11 @@ import ImageModal from '@/components/ImageModal';
 import {
   calculateShiftHours,
   formatHoursWhole,
+  formatLocalToIso,
   formatReportDate,
   formatTimeDisplay,
   getTodayDateString,
+  isoToLocalHHMM,
 } from '@/lib/ojt-calculations';
 import { fetchCalendarEntries } from '@/lib/calendar-service';
 
@@ -20,7 +22,9 @@ interface LogsTabProps {
   profile: UserProfile;
   logs: AttendanceLog[];
   calendarEntries?: CalendarEntry[];
-  onSaveLog: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
+  onSaveLog: (
+    log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string; originalDate?: string }
+  ) => Promise<void>;
   onDeleteLog: (id: string) => Promise<void>;
 }
 
@@ -32,11 +36,13 @@ export default function LogsTab({
   onDeleteLog,
 }: LogsTabProps) {
   const [editing, setEditing] = useState<AttendanceLog | null>(null);
+  const [originalDate, setOriginalDate] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [date, setDate] = useState(getTodayDateString());
-  const [timeIn, setTimeIn] = useState('08:00');
-  const [timeOut, setTimeOut] = useState('17:00');
+  const [timeIn, setTimeIn] = useState('09:00');
+  const [timeOut, setTimeOut] = useState('18:00');
+  const [isOvernight, setIsOvernight] = useState(false);
   const [summary, setSummary] = useState('');
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [emptySummaryModalOpen, setEmptySummaryModalOpen] = useState(false);
@@ -82,27 +88,47 @@ export default function LogsTab({
 
   const openNewModal = () => {
     setEditing(null);
+    setOriginalDate(null);
+    setIsOvernight(false);
     setDate(getTodayDateString());
-    setTimeIn(profile.daily_start_time?.slice(0, 5) || '08:00');
-    setTimeOut(profile.daily_end_time?.slice(0, 5) || '17:00');
+    setTimeIn(profile.daily_start_time?.slice(0, 5) || '09:00');
+    setTimeOut(profile.daily_end_time?.slice(0, 5) || '18:00');
     setSummary('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (log: AttendanceLog) => {
     setEditing(log);
+    setOriginalDate(log.date);
     setDate(log.date);
-    const toHHMM = (iso: string | null, fallback: string) => {
-      if (!iso) return fallback;
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return fallback;
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
-    setTimeIn(toHHMM(log.time_in, '08:00'));
-    setTimeOut(toHHMM(log.time_out, '17:00'));
+    setTimeIn(isoToLocalHHMM(log.time_in, '09:00'));
+    setTimeOut(isoToLocalHHMM(log.time_out, '18:00'));
+
+    if (log.time_in && log.time_out) {
+      const inDate = new Date(log.time_in).getDate();
+      const outDate = new Date(log.time_out).getDate();
+      setIsOvernight(inDate !== outDate);
+    } else {
+      setIsOvernight(false);
+    }
+
     setSummary(log.ai_summary || log.custom_tasks || '');
     setIsModalOpen(true);
   };
+
+  const computedShift = useMemo(() => {
+    if (!timeIn || !timeOut) return { hours: 0, isInverted: false, timeInIso: '', timeOutIso: '' };
+    const [hIn, mIn] = timeIn.split(':').map(Number);
+    const [hOut, mOut] = timeOut.split(':').map(Number);
+    const minsIn = (hIn || 0) * 60 + (mIn || 0);
+    const minsOut = (hOut || 0) * 60 + (mOut || 0);
+    const isInverted = minsOut <= minsIn;
+
+    const timeInIso = formatLocalToIso(date, timeIn, false);
+    const timeOutIso = formatLocalToIso(date, timeOut, isOvernight);
+    const hours = calculateShiftHours(timeInIso, timeOutIso, profile.lunch_break_minutes);
+    return { hours, isInverted, timeInIso, timeOutIso };
+  }, [date, timeIn, timeOut, isOvernight, profile.lunch_break_minutes]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,16 +141,15 @@ export default function LogsTab({
 
   const handleConfirmedSave = async () => {
     setSubmitting(true);
-    const timeInIso = `${date}T${timeIn}:00`;
-    const timeOutIso = `${date}T${timeOut}:00`;
-    const hrs = calculateShiftHours(timeInIso, timeOutIso, profile.lunch_break_minutes);
+    const { timeInIso, timeOutIso, hours } = computedShift;
 
     await onSaveLog({
       id: editing?.id,
+      originalDate: originalDate || undefined,
       date,
       time_in: timeInIso,
       time_out: timeOutIso,
-      hours_worked: hrs,
+      hours_worked: hours,
       tasks_selected: editing?.tasks_selected || [],
       custom_tasks: editing?.custom_tasks || '',
       ai_summary: summary.trim(),
@@ -348,6 +373,74 @@ export default function LogsTab({
                   </div>
                 </div>
 
+                {/* Inverted Time Warning / PM Auto-Fix & Overnight Toggle */}
+                {computedShift.isInverted && !isOvernight ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                    <div className="flex items-start gap-2 text-xs font-mono text-amber-900">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Time Out is earlier than Time In (0h worked).</span>
+                        <p className="text-[11px] text-amber-700 mt-0.5">
+                          Did you mean PM, or is this an overnight shift?
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      {parseInt(timeOut.split(':')[0], 10) < 12 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const [h, m] = timeOut.split(':');
+                            const pmH = parseInt(h, 10) + 12;
+                            setTimeOut(`${String(pmH).padStart(2, '0')}:${m}`);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-[#C44900] hover:bg-[#9E3B00] text-white text-[11px] font-mono font-bold cursor-pointer transition-colors"
+                        >
+                          Switch to PM ({parseInt(timeOut.split(':')[0], 10) + 12}:{timeOut.split(':')[1]})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsOvernight(true)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-900 text-[11px] font-mono font-bold cursor-pointer transition-colors inline-flex items-center gap-1"
+                      >
+                        <Moon className="w-3 h-3" />
+                        Overnight (+1 day)
+                      </button>
+                    </div>
+                  </div>
+                ) : isOvernight ? (
+                  <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between gap-2 text-xs font-mono text-indigo-900">
+                    <span className="inline-flex items-center gap-1.5 font-bold">
+                      <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                      Overnight shift enabled (ends next day)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsOvernight(false)}
+                      className="text-[11px] text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Disable
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Live Shift Preview Bar */}
+                <div className="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    Shift Preview:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">
+                      {formatTimeDisplay(timeIn)} → {formatTimeDisplay(timeOut)}
+                      {isOvernight && <span className="text-[#C44900] text-[10px] ml-1 font-bold">(+1d)</span>}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#C44900]/10 text-[#C44900] font-bold text-[11px]">
+                      {computedShift.hours}h net
+                    </span>
+                  </div>
+                </div>
+
                 {/* Day Photo Preview if attached in Calendar */}
                 {calendarMap.get(date)?.image_url && (
                   <div className="space-y-1.5">
@@ -395,8 +488,8 @@ export default function LogsTab({
         title={editing ? 'Confirm Save Attendance Log' : 'Confirm Add OJT Day Log'}
         description={
           editing
-            ? `Save your edits to the attendance log for ${formatReportDate(date)} (${timeIn} – ${timeOut})?`
-            : `Add a new OJT attendance log for ${formatReportDate(date)} (${timeIn} – ${timeOut})?`
+            ? `Save your edits to the attendance log for ${formatReportDate(date)} (${formatTimeDisplay(timeIn)} – ${formatTimeDisplay(timeOut)}${isOvernight ? ' next day' : ''} · ${computedShift.hours} hrs)?`
+            : `Add a new OJT attendance log for ${formatReportDate(date)} (${formatTimeDisplay(timeIn)} – ${formatTimeDisplay(timeOut)}${isOvernight ? ' next day' : ''} · ${computedShift.hours} hrs)?`
         }
         confirmLabel={editing ? 'Save Changes' : 'Add Log'}
         onConfirm={handleConfirmedSave}

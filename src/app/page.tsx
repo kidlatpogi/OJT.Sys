@@ -240,7 +240,7 @@ export default function LandingPage() {
               {hasDownloaded ? 'Download Update (.apk)' : 'Download for Android (.apk)'}
             </a>
             <span className="font-mono text-[11px] text-slate-500 text-center md:text-right">
-              v1.2.0 • Android 7.0+ (APK)
+              v1.2.1 • Android 7.0+ (APK)
             </span>
           </div>
         </section>

@@ -667,8 +667,10 @@ export default function PunchClockCard({
     if (!action) return;
     if (action === 'time-in') {
       await handleTimeIn();
-    } else if (action === 'time-out' || action === 'save-log') {
+    } else if (action === 'time-out') {
       await executeTimeOut(new Date().toISOString(), 'manual');
+    } else if (action === 'save-log') {
+      await handleSaveTasks();
     } else if (action === 'format-notes') {
       await handleFormatCustomNotes();
     }
@@ -1339,7 +1341,7 @@ export default function PunchClockCard({
             className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 disabled:cursor-not-allowed text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            {isSaving ? 'Saving & Timing Out...' : 'Save Today’s Log'}
+            {isSaving ? 'Saving Tasks...' : 'Save Today’s Log'}
           </button>
         </div>
       </section>
@@ -1350,8 +1352,10 @@ export default function PunchClockCard({
         title={
           pendingAction === 'time-in'
             ? 'Confirm Time-In'
-            : pendingAction === 'time-out' || pendingAction === 'save-log'
+            : pendingAction === 'time-out'
             ? 'Confirm Time-Out'
+            : pendingAction === 'save-log'
+            ? "Save Today's Tasks & Summary"
             : pendingAction === 'format-notes'
             ? 'Add Notes to Summary'
             : "Save Today's Log"
@@ -1359,8 +1363,10 @@ export default function PunchClockCard({
         description={
           pendingAction === 'time-in'
             ? `Record your Time-In for ${liveDateStr} at ${liveTimeStr}?`
-            : pendingAction === 'time-out' || pendingAction === 'save-log'
+            : pendingAction === 'time-out'
             ? `Complete your shift and record Time-Out at ${liveTimeStr}? Your selected tasks will be formatted automatically for your reports.`
+            : pendingAction === 'save-log'
+            ? `Save your checked tasks and accomplishment summary to your log for ${liveDateStr}? (You will remain clocked in until you tap Time-Out).`
             : pendingAction === 'format-notes'
             ? 'Format your custom notes (along with any checked tasks) into past-tense statements for the Weekly & Monthly Report Summary?'
             : "Save today's checked tasks and accomplishment summary to your attendance log?"
@@ -1368,8 +1374,10 @@ export default function PunchClockCard({
         confirmLabel={
           pendingAction === 'time-in'
             ? 'Time In'
-            : pendingAction === 'time-out' || pendingAction === 'save-log'
+            : pendingAction === 'time-out'
             ? 'Time Out'
+            : pendingAction === 'save-log'
+            ? 'Save Progress'
             : pendingAction === 'format-notes'
             ? 'Add to Summary'
             : 'Save Log'

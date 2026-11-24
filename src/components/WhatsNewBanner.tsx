@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, X, Clock, Layers, Tag, ShieldCheck } from 'lucide-react';
 
-const STORAGE_KEY = 'ojt_whats_new_v1_2_0_dismissed';
+const STORAGE_KEY = 'ojt_whats_new_v1_2_1_dismissed';
 
 interface WhatsNewBannerProps {
   onDismiss?: () => void;
@@ -40,7 +40,7 @@ export default function WhatsNewBanner({ onDismiss, className = '' }: WhatsNewBa
   return (
     <div
       role="region"
-      aria-label="What's New in OJT.SYS v1.2.0"
+      aria-label="What's New in OJT.SYS v1.2.1"
       className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-[#C44900]/30 bg-gradient-to-r from-orange-50/90 via-white to-amber-50/60 p-4 sm:p-5 shadow-sm transition-all duration-300 ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -52,29 +52,29 @@ export default function WhatsNewBanner({ onDismiss, className = '' }: WhatsNewBa
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#C44900]/15 text-[#C44900]">
-                What&apos;s New • v1.2.0
+                What&apos;s New • v1.2.1
               </span>
               <span className="font-clash-semibold text-sm sm:text-base font-bold text-slate-900">
-                Live Hours, Multi-Internship &amp; Custom Tags
+                Accurate Time Logging, Smart PM Detection &amp; Shift Fixes
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs text-slate-700 pt-1">
               <div className="flex items-center gap-1.5 font-medium">
                 <Clock className="w-3.5 h-3.5 text-[#C44900] shrink-0" />
-                <span>Live Real-Time Hours Counter</span>
+                <span>Exact 9am–5pm Local Time (No Drift)</span>
               </div>
               <div className="flex items-center gap-1.5 font-medium">
-                <Layers className="w-3.5 h-3.5 text-[#C44900] shrink-0" />
-                <span>Multiple Internship Programs</span>
+                <Sparkles className="w-3.5 h-3.5 text-[#C44900] shrink-0" />
+                <span>Smart Inverted Time &amp; 1-Click PM Fix</span>
               </div>
               <div className="flex items-center gap-1.5 font-medium">
                 <Tag className="w-3.5 h-3.5 text-[#C44900] shrink-0" />
-                <span>Custom Task Checklist Tags</span>
+                <span>Save Tasks Without Time-Out</span>
               </div>
               <div className="flex items-center gap-1.5 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#C44900] shrink-0" />
-                <span>Password-Protected Deletions</span>
+                <span>Clean Date Moves &amp; Protected CRUD</span>
               </div>
             </div>
           </div>
