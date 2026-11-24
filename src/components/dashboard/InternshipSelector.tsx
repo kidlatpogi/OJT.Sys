@@ -67,8 +67,8 @@ export default function InternshipSelector({
     <div
       ref={containerRef}
       className={`relative ${
-        variant === 'mobile-strip' || variant === 'railway' ? 'w-full block' : 'inline-block'
-      } text-left ${className}`}
+        variant === 'mobile-strip' ? 'w-full block' : 'inline-block'
+      } ${variant === 'railway' ? 'w-full block' : ''} text-left ${className}`}
     >
       {/* Selector Trigger Button */}
       <button

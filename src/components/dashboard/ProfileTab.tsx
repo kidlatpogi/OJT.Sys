@@ -43,6 +43,7 @@ const ProfileTab = React.memo(function ProfileTab({
   const [autoTimeOut, setAutoTimeOut] = useState(profile.auto_time_out !== false);
   const [offlineSync, setOfflineSync] = useState(profile.offline_sync !== false);
   const [sideRailNav, setSideRailNav] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -54,19 +55,26 @@ const ProfileTab = React.memo(function ProfileTab({
     } catch {
       setSideRailNav(false);
     }
+    const checkMobile = () => {
+      setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const handleToggleSideRail = () => {
-    setSideRailNav((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('ojt_nav_layout', next ? 'rail' : 'top');
+    if (isMobile) return;
+    const next = !sideRailNav;
+    setSideRailNav(next);
+    try {
+      localStorage.setItem('ojt_nav_layout', next ? 'rail' : 'top');
+      setTimeout(() => {
         window.dispatchEvent(new Event('ojt_nav_layout_change'));
-      } catch (err) {
-        console.warn('Failed to save nav layout preference:', err);
-      }
-      return next;
-    });
+      }, 0);
+    } catch (err) {
+      console.warn('Failed to save nav layout preference:', err);
+    }
   };
 
   useEffect(() => {
@@ -287,15 +295,17 @@ const ProfileTab = React.memo(function ProfileTab({
                   Desktop Side Railway Navigation
                 </span>
 
-                {/* Active / Disabled badge */}
+                {/* Active / Disabled / Desktop Only badge */}
                 <span
                   className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                    sideRailNav
+                    isMobile
+                      ? 'bg-slate-200/80 text-slate-600 border border-slate-300'
+                      : sideRailNav
                       ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
                       : 'bg-red-50 text-red-600 border border-red-200'
                   }`}
                 >
-                  {sideRailNav ? 'Active' : 'Disabled'}
+                  {isMobile ? 'Desktop Only' : sideRailNav ? 'Active' : 'Disabled'}
                 </span>
 
                 {/* Info "i" Hover Tooltip */}
@@ -310,13 +320,15 @@ const ProfileTab = React.memo(function ProfileTab({
                     i
                   </button>
                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[85vw] p-2.5 bg-slate-900 text-white rounded-xl shadow-xl font-mono text-[10.5px] leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
-                    Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking.
+                    Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking. Disabled on mobile viewports.
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
                   </div>
                 </div>
               </div>
               <p className="font-mono text-[11px] text-slate-500">
-                Display navigation menu as a vertical side rail along the left side of the screen on desktop viewports.
+                {isMobile
+                  ? 'Disabled on mobile viewports. This layout feature is only active on desktop screens (≥1024px).'
+                  : 'Display navigation menu as a vertical side rail along the left side of the screen on desktop viewports.'}
               </p>
             </div>
 
@@ -325,17 +337,23 @@ const ProfileTab = React.memo(function ProfileTab({
               <button
                 type="button"
                 role="switch"
-                aria-checked={sideRailNav}
+                aria-checked={!isMobile && sideRailNav}
                 aria-label="Desktop Side Railway Navigation"
+                disabled={isMobile}
                 onClick={handleToggleSideRail}
-                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
-                  sideRailNav ? 'bg-[#C44900]' : 'bg-slate-300'
+                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
+                  isMobile
+                    ? 'opacity-40 cursor-not-allowed bg-slate-300'
+                    : sideRailNav
+                    ? 'cursor-pointer bg-[#C44900]'
+                    : 'cursor-pointer bg-slate-300'
                 }`}
+                title={isMobile ? 'Desktop Side Railway Navigation is disabled on mobile devices' : undefined}
               >
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                    sideRailNav ? 'translate-x-5' : 'translate-x-0'
+                    !isMobile && sideRailNav ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
