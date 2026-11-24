@@ -2,9 +2,39 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckSquare, CloudLightning, ShieldCheck, Sparkles, X, Zap } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import {
+  Clock,
+  CloudLightning,
+  Download,
+  Layers,
+  RefreshCw,
+  ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
+  Sparkles,
+  X,
+} from 'lucide-react';
+import { APP_VERSION } from '@/config/version';
+import {
+  CHANGELOG_ITEMS,
+  ChangelogItem,
+  WHATS_NEW_STORAGE_KEY,
+} from '@/config/changelog';
 
-export const WHATS_NEW_STORAGE_KEY = 'ojt_whats_new_v1_3_0_dismissed';
+export { CHANGELOG_ITEMS, WHATS_NEW_STORAGE_KEY };
+export type { ChangelogItem };
+
+const ICON_MAP: Record<ChangelogItem['iconName'], React.ComponentType<{ className?: string }>> = {
+  Smartphone,
+  RefreshCw,
+  CloudLightning,
+  SlidersHorizontal,
+  Clock,
+  Layers,
+  ShieldCheck,
+  Download,
+};
 
 interface WhatsNewModalProps {
   isOpen?: boolean;
@@ -17,6 +47,7 @@ export default function WhatsNewModal({
   onClose,
   forceShow = false,
 }: WhatsNewModalProps) {
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -64,6 +95,11 @@ export default function WhatsNewModal({
     };
   }, [isOpen, handleDismiss]);
 
+  // Strict route guard: WhatsNewModal must never show outside of authenticated /dashboard
+  if (pathname !== '/dashboard' && !forceShow) {
+    return null;
+  }
+
   if (!mounted || !isOpen || typeof document === 'undefined') {
     return null;
   }
@@ -90,14 +126,14 @@ export default function WhatsNewModal({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#C44900]/15 text-[#C44900]">
-                  What&apos;s New • v1.3.0
+                  What&apos;s New • v{APP_VERSION}
                 </span>
               </div>
               <h3
                 id="whats-new-modal-title"
                 className="font-clash-semibold text-lg sm:text-xl font-bold text-slate-900 mt-0.5"
               >
-                Release Highlights &amp; Performance Update
+                Release Highlights &amp; System Updates
               </h3>
             </div>
           </div>
@@ -114,61 +150,32 @@ export default function WhatsNewModal({
 
         {/* Highlight Items Grid */}
         <div className="space-y-3">
-          <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-[#C44900]/20 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#C44900]/10 text-[#C44900] flex items-center justify-center shrink-0 mt-0.5">
-              <CheckSquare className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="font-sans text-xs sm:text-sm font-bold text-slate-900">
-                Real-Time Task Checkbox Reflection
-              </h4>
-              <p className="font-mono text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Checked tasks under &ldquo;What did you work on?&rdquo; now immediately sync in real-time with the Day Activity Inspector on the Calendar before clocking out.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-              <CloudLightning className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="font-sans text-xs sm:text-sm font-bold text-slate-900">
-                Local Save &amp; Cloud Sync Toggle
-              </h4>
-              <p className="font-mono text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Added an Offline Attendance preference switch in Profile Settings with an active status badge and instant storage persistence.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="font-sans text-xs sm:text-sm font-bold text-slate-900">
-                Supabase 401 Unauthorized Recovery
-              </h4>
-              <p className="font-mono text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Proactive session validation, automatic token refresh, and durable local storage caching protect your calendar entries against auth timeouts.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-              <Zap className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="font-sans text-xs sm:text-sm font-bold text-slate-900">
-                High Performance &amp; Zero-Lag Sync
-              </h4>
-              <p className="font-mono text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                Isolated 1-second clock tickers, memoized calendar day tiles, and debounced cloud sync eliminate card re-render cascades.
-              </p>
-            </div>
-          </div>
+          {CHANGELOG_ITEMS.map((item) => {
+            const ItemIcon = ICON_MAP[item.iconName] || Sparkles;
+            return (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 hover:border-orange-200 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#C44900] flex items-center justify-center shrink-0 mt-0.5">
+                  <ItemIcon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-sans text-xs sm:text-sm font-bold text-slate-900">
+                      {item.title}
+                    </h4>
+                    <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-semibold shrink-0">
+                      {item.badge}
+                    </span>
+                  </div>
+                  <p className="font-mono text-[11px] text-slate-600 mt-1 leading-relaxed">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Footer Action Button */}
@@ -178,7 +185,7 @@ export default function WhatsNewModal({
             onClick={handleDismiss}
             className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-sm sm:text-base inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-[0.99]"
           >
-            Got it, Explore App
+            Got it, Continue to Dashboard
           </button>
         </div>
       </div>

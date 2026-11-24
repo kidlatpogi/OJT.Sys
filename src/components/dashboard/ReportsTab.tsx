@@ -170,7 +170,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">

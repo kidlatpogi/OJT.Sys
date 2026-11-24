@@ -387,7 +387,7 @@ const CalendarTab = React.memo(function CalendarTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       {/* Responsive Grid: Left 8 cols on desktop for Calendar, Right 4 cols for Desktop Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left (8 cols): Dark Hero Monthly Calendar */}

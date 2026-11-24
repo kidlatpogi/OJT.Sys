@@ -289,7 +289,7 @@ export default function LogsTab({
   }, [logs.length, totalLoggedHours]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       {/* Top Header & Quick Add */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

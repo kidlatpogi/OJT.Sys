@@ -126,7 +126,10 @@ test('R1-T2-4 (Boundary): Safe area insets (safe-top, safe-bottom) are applied w
   const content = fs.readFileSync(filePath, 'utf-8');
 
   assert.ok(content.includes('safe-top'), 'Header retains safe-top for notch');
-  assert.ok(content.includes('pb-24 sm:pb-12'), 'Bottom padding accommodates bottom nav');
+  assert.ok(
+    content.includes('pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]') || content.includes('pb-36'),
+    'Bottom padding accommodates bottom nav'
+  );
 });
 
 test('R1-T2-5 (Boundary): Android styles.xml preserves NoActionBar across all subthemes', () => {

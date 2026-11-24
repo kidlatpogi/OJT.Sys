@@ -22,6 +22,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
 import { DashboardSkeleton, TabContentSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import WhatsNewModal from '@/components/WhatsNewModal';
+import ApkUpdateModal from '@/components/ApkUpdateModal';
 
 const CalendarTab = dynamic(() => import('@/components/dashboard/CalendarTab'), {
   loading: () => <TabContentSkeleton label="Calendar" />,
@@ -864,7 +865,7 @@ export default function DashboardPage() {
   }, [mode, router]);
 
   return (
-    <div className="relative min-h-[100dvh] pb-24 sm:pb-12">
+    <div className="relative min-h-[100dvh] pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       <div className="no-print">
         <ShapeGrid />
       </div>
@@ -944,6 +945,7 @@ export default function DashboardPage() {
 
         {/* Announcement / What's New Dialog (dismissable modal, 1-time display) */}
         <WhatsNewModal />
+        <ApkUpdateModal />
 
         {/* Compact Cumulative OJT Hours Progress Strip */}
         <section className="no-print bg-white border-2 border-slate-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-5">

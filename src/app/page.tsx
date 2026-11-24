@@ -16,7 +16,7 @@ import {
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
 import LandingNavActions from '@/components/LandingNavActions';
-import WhatsNewModal from '@/components/WhatsNewModal';
+import { APP_VERSION } from '@/config/version';
 
 const reportCards = [
   {
@@ -74,9 +74,6 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-16">
-        {/* One-time What's New Announcement Modal */}
-        <WhatsNewModal />
-
         <div className="max-w-3xl">
           <h1 className="font-clash-semibold text-[2.5rem] leading-[0.95] sm:text-6xl md:text-7xl font-bold tracking-tighter text-black">
             Track Daily OJT.
@@ -216,7 +213,7 @@ export default function LandingPage() {
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#C44900] font-mono text-[11px] font-bold uppercase tracking-wider">
               <Smartphone className="w-3.5 h-3.5" />
-              {hasDownloaded ? 'Update Available • v1.2.0' : 'Android App • Capacitor'}
+              {hasDownloaded ? `Update Available • v${APP_VERSION}` : 'Android App • Capacitor'}
             </div>
             <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-3">
               {hasDownloaded ? 'Update OJT.SYS on Your Android Device' : 'Install OJT.SYS on Your Android Device'}
@@ -240,7 +237,7 @@ export default function LandingPage() {
               {hasDownloaded ? 'Download Update (.apk)' : 'Download for Android (.apk)'}
             </a>
             <span className="font-mono text-[11px] text-slate-500 text-center md:text-right">
-              v1.2.1 • Android 7.0+ (APK)
+              v{APP_VERSION} • Android 7.0+ (APK)
             </span>
           </div>
         </section>

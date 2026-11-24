@@ -795,7 +795,7 @@ const PunchClockCard = React.memo(function PunchClockCard({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       {/* Mobile-Responsive Notification Banner */}
       {toast && (
         <div
