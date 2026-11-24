@@ -14,9 +14,15 @@ interface ProfileTabProps {
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => Promise<void>;
   onSignOut: () => Promise<void>;
+  navLayout?: 'top' | 'rail';
 }
 
-const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSignOut }: ProfileTabProps) {
+const ProfileTab = React.memo(function ProfileTab({
+  profile,
+  onSaveProfile,
+  onSignOut,
+  navLayout = 'top',
+}: ProfileTabProps) {
   const [formData, setFormData] = useState<StandardProfileFormData>(() => {
     const { firstName, lastName } = splitFullName(profile.full_name);
     return {
@@ -128,7 +134,9 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
         <button
           type="button"
           onClick={() => setConfirmSignOut(true)}
-          className="h-10 px-4 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto"
+          className={`h-10 px-4 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto ${
+            navLayout === 'rail' ? 'sm:hidden' : ''
+          }`}
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign Out

@@ -14,9 +14,17 @@ export interface ChangelogItem {
   description: string;
 }
 
-export const WHATS_NEW_STORAGE_KEY = 'ojt_whats_new_v1_4_0_dismissed';
+export const WHATS_NEW_STORAGE_KEY = 'ojt_whats_new_v1_5_0_dismissed';
 
 export const CHANGELOG_ITEMS: ChangelogItem[] = [
+  {
+    id: 'railway-navigation',
+    title: 'Desktop Side Railway Navigation',
+    badge: 'Navigation',
+    iconName: 'Layers',
+    description:
+      'Seamlessly switch between top navigation bar and a fixed left-side vertical railway from Profile Preferences, featuring integrated internship switching and dedicated sign out.',
+  },
   {
     id: 'mobile-scrolling',
     title: 'Full-Height Mobile Scrolling Fix',

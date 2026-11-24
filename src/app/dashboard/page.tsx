@@ -10,6 +10,7 @@ import {
   Clock,
   FileText,
   ListChecks,
+  LogOut,
   RefreshCw,
   UserCog,
   WifiOff,
@@ -136,6 +137,10 @@ export default function DashboardPage() {
   const [editingInternship, setEditingInternship] = useState<Internship | null>(null);
   const [deletingInternship, setDeletingInternship] = useState<Internship | null>(null);
   const [isDeletingInternship, setIsDeletingInternship] = useState(false);
+
+  // Sign out confirmation modal state for railway navigation
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const supabaseReady = isSupabaseConfigured();
 
@@ -891,16 +896,34 @@ export default function DashboardPage() {
 
       {/* Desktop Left Side Navigation Rail */}
       {navLayout === 'rail' && (
-        <aside className="no-print hidden lg:flex flex-col w-20 xl:w-56 shrink-0 bg-white/95 backdrop-blur-md border-r border-slate-200/90 sticky top-0 h-screen p-3.5 justify-between z-30 select-none shadow-xs">
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 px-2 py-1">
+        <aside className="no-print hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white/95 backdrop-blur-md border-r border-slate-200/90 h-screen p-4 justify-between z-30 select-none shadow-xs overflow-y-auto no-scrollbar">
+          <div className="space-y-4">
+            {/* Brand Logo (Single BrandMark, no duplicate text) */}
+            <div className="px-1 py-1">
               <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
-              <span className="hidden xl:inline font-clash-semibold text-lg font-bold tracking-tight">
-                OJT.SYS
-              </span>
             </div>
 
-            <nav className="space-y-1.5" aria-label="Side rail navigation">
+            {/* Internship Programs Switcher */}
+            {internships.length > 0 && (
+              <div className="pt-0.5">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5 px-1">
+                  Active Program
+                </span>
+                <InternshipSelector
+                  internships={internships}
+                  activeInternshipId={activeInternshipId}
+                  onSelectInternship={handleSelectInternship}
+                  onAddNewInternship={handleRequestAddInternship}
+                  onEditInternship={(i) => setEditingInternship(i)}
+                  onDeleteInternship={(i) => setDeletingInternship(i)}
+                  getInternshipHours={getInternshipHours}
+                  variant="railway"
+                />
+              </div>
+            )}
+
+            {/* Navigation items */}
+            <nav className="space-y-1.5 pt-1" aria-label="Side rail navigation">
               {NAV_ITEMS.map((item) => {
                 const isActive = activeTab === item.key;
                 return (
@@ -916,63 +939,77 @@ export default function DashboardPage() {
                     title={item.label}
                   >
                     <span className="shrink-0">{item.icon}</span>
-                    <span className="hidden xl:inline truncate">{item.label}</span>
+                    <span className="truncate">{item.label}</span>
                   </button>
                 );
               })}
             </nav>
           </div>
 
-          {/* Bottom rail user info / status */}
-          <div className="pt-3 border-t border-slate-100 space-y-2">
+          {/* Bottom rail user info, status & Sign Out */}
+          <div className="pt-3 border-t border-slate-100 space-y-2.5">
             {!isOnline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold w-full justify-center xl:justify-start">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold w-full justify-start">
                 <WifiOff className="w-3 h-3 text-amber-600 shrink-0" />
-                <span className="hidden xl:inline">Offline</span>
+                <span>Offline</span>
               </span>
             ) : isSyncing ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold w-full justify-center xl:justify-start">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold w-full justify-start">
                 <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />
-                <span className="hidden xl:inline">Syncing...</span>
+                <span>Syncing...</span>
               </span>
             ) : null}
 
-            <div className="hidden xl:block px-2">
-              <span className="text-[10px] font-mono text-slate-400 block truncate">
+            <div className="px-1">
+              <span className="text-[10.5px] font-mono text-slate-400 block truncate font-medium">
                 {effectiveProfile.full_name}
               </span>
+              {effectiveProfile.company_name && (
+                <span className="text-[10px] font-mono text-slate-400 block truncate">
+                  {effectiveProfile.company_name}
+                </span>
+              )}
             </div>
+
+            {/* Dedicated Railway Sign Out Button */}
+            <button
+              type="button"
+              onClick={() => setShowSignOutConfirm(true)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-mono text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200/80 hover:border-red-200 transition-colors cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </aside>
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0">
-        {/* Top Sticky Header (hidden on mobile preview / Capacitor APK view per R1) */}
-        <header className="no-print hidden sm:block sticky top-0 z-30 bg-[#f8f8f8]/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 safe-top">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {navLayout === 'top' && (
+      <div className={`flex-1 min-w-0 ${navLayout === 'rail' ? 'lg:pl-64' : ''}`}>
+        {/* Top Sticky Header (shown when top nav layout is selected) */}
+        {navLayout === 'top' && (
+          <header className="no-print hidden sm:block sticky top-0 z-30 bg-[#f8f8f8]/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 safe-top">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
-              )}
-              {internships.length > 0 && (
-                <div className={`hidden sm:flex items-center ${navLayout === 'top' ? 'border-l border-slate-200 pl-3' : ''}`}>
-                  <InternshipSelector
-                    internships={internships}
-                    activeInternshipId={activeInternshipId}
-                    onSelectInternship={handleSelectInternship}
-                    onAddNewInternship={handleRequestAddInternship}
-                    onEditInternship={(i) => setEditingInternship(i)}
-                    onDeleteInternship={(i) => setDeletingInternship(i)}
-                    getInternshipHours={getInternshipHours}
-                    variant="header"
-                  />
-                </div>
-              )}
-            </div>
+                {internships.length > 0 && (
+                  <div className="hidden sm:flex items-center border-l border-slate-200 pl-3">
+                    <InternshipSelector
+                      internships={internships}
+                      activeInternshipId={activeInternshipId}
+                      onSelectInternship={handleSelectInternship}
+                      onAddNewInternship={handleRequestAddInternship}
+                      onEditInternship={(i) => setEditingInternship(i)}
+                      onDeleteInternship={(i) => setDeletingInternship(i)}
+                      getInternshipHours={getInternshipHours}
+                      variant="header"
+                    />
+                  </div>
+                )}
+              </div>
 
-            {/* Desktop Navigation Pills (shown when top nav layout is selected) */}
-            {navLayout === 'top' && (
+              {/* Desktop Navigation Pills (shown when top nav layout is selected) */}
               <div className="hidden sm:flex items-center gap-3">
                 {!isOnline ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold">
@@ -1003,9 +1040,9 @@ export default function DashboardPage() {
                   ))}
                 </nav>
               </div>
-            )}
-          </div>
-        </header>
+            </div>
+          </header>
+        )}
 
       {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-6 space-y-5">
@@ -1149,6 +1186,7 @@ export default function DashboardPage() {
                 profile={effectiveProfile}
                 onSaveProfile={handleSaveProfile}
                 onSignOut={handleSignOut}
+                navLayout={navLayout}
               />
             )}
           </>
@@ -1215,6 +1253,23 @@ export default function DashboardPage() {
         loading={isDeletingInternship}
         onConfirm={handleConfirmedDeleteInternship}
         onCancel={() => setDeletingInternship(null)}
+      />
+
+      {/* Modal for Railway Sign Out Confirmation */}
+      <ConfirmModal
+        isOpen={showSignOutConfirm}
+        loading={isSigningOut}
+        variant="danger"
+        title="Sign Out"
+        description="Are you sure you want to sign out of OJT.SYS? Your saved attendance logs and calendar records will remain safely stored."
+        confirmLabel="Sign Out"
+        onConfirm={async () => {
+          setIsSigningOut(true);
+          await handleSignOut();
+          setIsSigningOut(false);
+          setShowSignOutConfirm(false);
+        }}
+        onCancel={() => setShowSignOutConfirm(false)}
       />
       </div>
 
