@@ -10,11 +10,13 @@ import {
   LogOut,
   Pencil,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   SlidersHorizontal,
   Trash2,
   Upload,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { AttendanceLog, ChecklistItem, PRESET_OJT_TASKS, UserProfile } from '@/types/ojt';
@@ -37,6 +39,9 @@ interface PunchClockCardProps {
   onSaveLog: (log: Omit<AttendanceLog, 'id' | 'user_id'> & { id?: string }) => Promise<void>;
   onCalendarUpdated?: () => void;
   onUpdateChecklist?: (items: ChecklistItem[]) => Promise<void>;
+  isOnline?: boolean;
+  pendingSyncCount?: number;
+  isSyncing?: boolean;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -59,14 +64,73 @@ function getTodayShiftEndDate(dailyEndTime: string): Date | null {
   return d;
 }
 
-export default function PunchClockCard({
+interface LiveClockTickerProps {
+  todayStr: string;
+  badges?: React.ReactNode;
+}
+
+const LiveClockTicker = React.memo(function LiveClockTicker({
+  todayStr,
+  badges,
+}: LiveClockTickerProps) {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const liveTimeStr = now
+    ? now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      })
+    : '--:--:--';
+
+  const liveDateStr = now
+    ? now.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : todayStr;
+
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          suppressHydrationWarning
+          className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 truncate"
+        >
+          {liveDateStr}
+        </span>
+        {badges}
+      </div>
+      <div
+        suppressHydrationWarning
+        className="font-mono text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 tabular-nums"
+      >
+        {liveTimeStr}
+      </div>
+    </>
+  );
+});
+
+const PunchClockCard = React.memo(function PunchClockCard({
   profile,
   todayLog,
   onSaveLog,
   onCalendarUpdated,
   onUpdateChecklist,
+  isOnline = true,
+  pendingSyncCount = 0,
+  isSyncing = false,
 }: PunchClockCardProps) {
-  const [now, setNow] = useState<Date | null>(null);
+  const [shiftTime, setShiftTime] = useState<Date>(() => new Date());
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [customTasks, setCustomTasks] = useState('');
   const [aiSummary, setAiSummary] = useState('');
@@ -177,8 +241,8 @@ export default function PunchClockCard({
   }, []);
 
   useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000);
+    setShiftTime(new Date());
+    const id = setInterval(() => setShiftTime(new Date()), 15000);
     return () => clearInterval(id);
   }, []);
 
@@ -224,11 +288,11 @@ export default function PunchClockCard({
 
   const liveNetHours = useMemo(() => {
     if (todayLog?.hours_worked) return todayLog.hours_worked;
-    if (isTimedIn && !isTimedOut && todayLog?.time_in && now) {
-      return calculateShiftHours(todayLog.time_in, now.toISOString(), profile.lunch_break_minutes);
+    if (isTimedIn && !isTimedOut && todayLog?.time_in && shiftTime) {
+      return calculateShiftHours(todayLog.time_in, shiftTime.toISOString(), profile.lunch_break_minutes);
     }
     return 0;
-  }, [todayLog?.hours_worked, todayLog?.time_in, isTimedIn, isTimedOut, now, profile.lunch_break_minutes]);
+  }, [todayLog?.hours_worked, todayLog?.time_in, isTimedIn, isTimedOut, shiftTime, profile.lunch_break_minutes]);
 
   // Check if today already has a calendar entry
   useEffect(() => {
@@ -345,9 +409,26 @@ export default function PunchClockCard({
   const toggleTask = (label: string) => {
     if (isChecklistLocked) return;
     setTasksDirty(true);
-    setSelectedTasks((prev) =>
-      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
-    );
+    const nextTasks = selectedTasks.includes(label)
+      ? selectedTasks.filter((item) => item !== label)
+      : [...selectedTasks, label];
+    setSelectedTasks(nextTasks);
+
+    // Immediately sync with parent logs & Day Activity Inspector if clocked in
+    if (todayLog?.time_in && !todayLog?.time_out) {
+      onSaveLog({
+        id: todayLog.id,
+        date: todayLog.date || todayStr,
+        time_in: todayLog.time_in,
+        time_out: null,
+        hours_worked: todayLog.hours_worked || 0,
+        tasks_selected: nextTasks,
+        custom_tasks: customTasks,
+        ai_summary: aiSummary,
+        ai_provider: aiProvider,
+        internship_id: todayLog.internship_id,
+      });
+    }
   };
 
   const handleReloadPreloadedTasks = async () => {
@@ -568,7 +649,7 @@ export default function PunchClockCard({
 
   // Auto Time-Out Watcher with Restrictions (5a: requires >=1 checked task, 5b: rounds up to exact whole hour)
   useEffect(() => {
-    if (!now) return;
+    if (!shiftTime) return;
     if (profile.auto_time_out === false) return;
     if (!isTimedIn || isTimedOut || isSaving) return;
     if (autoTimeOutTriggeredRef.current) return;
@@ -583,7 +664,7 @@ export default function PunchClockCard({
       return;
     }
 
-    if (now.getTime() >= shiftEnd.getTime()) {
+    if (shiftTime.getTime() >= shiftEnd.getTime()) {
       // Restriction 5a: Do NOT auto time-out if none of "What did you work on?" is checked
       if (selectedTasks.length === 0) {
         setAutoTimeOutBlocked(true);
@@ -597,7 +678,7 @@ export default function PunchClockCard({
       setAutoTimeOutBlocked(false);
     }
   }, [
-    now,
+    shiftTime,
     profile.auto_time_out,
     profile.daily_end_time,
     todayLog?.time_in,
@@ -701,26 +782,20 @@ export default function PunchClockCard({
     }
   };
 
-  const liveTimeStr = now
-    ? now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      })
-    : '--:--:--';
-
-  const liveDateStr = now
-    ? now.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : todayStr;
+  const currentFormattedTime = shiftTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const currentFormattedDate = shiftTime.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
       {/* Mobile-Responsive Notification Banner */}
       {toast && (
         <div
@@ -740,124 +815,177 @@ export default function PunchClockCard({
         </div>
       )}
 
-      {/* Dark Hero Punch Clock Card */}
-      <section className="bg-[#141313] text-white rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                suppressHydrationWarning
-                className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-400 truncate"
-              >
-                {liveDateStr}
-              </span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono font-bold uppercase tracking-wider shrink-0 ${
-                  isTimedOut
-                    ? 'bg-[#C44900] text-white border border-[#C44900]'
-                    : isTimedIn
-                    ? 'bg-[#C44900]/20 text-orange-300 border border-[#C44900]/50'
-                    : 'bg-white/10 text-slate-300 border border-white/10'
+      {/* Desktop Responsive Split Grid (5 cols Left: Clock, 7 cols Right: Checklist & Summary) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Column (5 cols): Sticky Hero Punch Clock Card + Policy Snapshot */}
+        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-20">
+          <section className="bg-[#141313] text-white rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <LiveClockTicker
+                  todayStr={todayStr}
+                  badges={
+                    <>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-mono font-bold uppercase tracking-wider shrink-0 ${
+                          isTimedOut
+                            ? 'bg-[#C44900] text-white border border-[#C44900]'
+                            : isTimedIn
+                            ? 'bg-[#C44900]/20 text-orange-300 border border-[#C44900]/50'
+                            : 'bg-white/10 text-slate-300 border border-white/10'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isTimedOut ? 'bg-white' : isTimedIn ? 'bg-[#C44900]' : 'bg-slate-400'
+                          }`}
+                        />
+                        {isTimedOut ? 'Shift Done' : isTimedIn ? 'On Shift' : 'Not Timed In Yet'}
+                      </span>
+                      {!isOnline && (
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1 shrink-0">
+                          <WifiOff className="w-2.5 h-2.5" />
+                          Offline
+                        </span>
+                      )}
+                      {isSyncing && (
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1 shrink-0">
+                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          Syncing
+                        </span>
+                      )}
+                    </>
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Timestamps Strip */}
+            <div className="grid grid-cols-3 gap-2.5 mt-5">
+              <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
+                <span className="block font-mono text-[10px] uppercase text-slate-400">Time In</span>
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
+                >
+                  {formatTimeDisplay(todayLog?.time_in || null)}
+                </span>
+              </div>
+              <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
+                <span className="block font-mono text-[10px] uppercase text-slate-400">Time Out</span>
+                <span
+                  suppressHydrationWarning
+                  className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
+                >
+                  {formatTimeDisplay(todayLog?.time_out || null)}
+                </span>
+              </div>
+              <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
+                <span className="block font-mono text-[10px] uppercase text-slate-400">Net Hours</span>
+                <span className="font-mono text-xs sm:text-base font-bold text-[#C44900] mt-0.5 block">
+                  {liveNetHours ? formatHoursWhole(liveNetHours) : '0h'}
+                </span>
+              </div>
+            </div>
+
+            {/* Auto Time-Out Blocked Warning (Restriction 5a) */}
+            {autoTimeOutBlocked && (
+              <div className="mt-4 p-3.5 rounded-2xl bg-red-950/60 border border-red-500/50 text-red-100 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <p className="font-mono text-[11px] leading-relaxed">
+                  Your scheduled shift end ({profile.daily_end_time?.slice(0, 5) || '18:00'}) has passed, but auto time-out is paused because no task is checked under <strong>&ldquo;What did you work on?&rdquo;</strong> below.
+                </p>
+              </div>
+            )}
+
+            {/* Thumb-Friendly Punch Action Buttons */}
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isSaving || isTimedIn}
+                onClick={() => setPendingAction('time-in')}
+                className={`h-14 rounded-2xl font-clash-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+                  isTimedIn
+                    ? 'bg-white/10 text-slate-400 cursor-not-allowed'
+                    : 'bg-[#C44900] hover:bg-[#9E3B00] text-white active:scale-[0.99]'
                 }`}
               >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isTimedOut ? 'bg-white' : isTimedIn ? 'bg-emerald-400' : 'bg-slate-400'
-                  }`}
-                />
-                {isTimedOut ? 'Shift Done' : isTimedIn ? 'On Shift' : 'Not Timed In Yet'}
+                <LogIn className="w-5 h-5" />
+                {isTimedIn ? 'Timed In Today' : 'Tap to Time-In'}
+              </button>
+
+              <button
+                type="button"
+                disabled={isSaving || !isTimedIn || isTimedOut}
+                onClick={handleManualTimeOut}
+                className={`h-14 rounded-2xl font-clash-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+                  !isTimedIn || isTimedOut
+                    ? 'bg-white/10 text-slate-500 cursor-not-allowed'
+                    : 'bg-white text-black hover:bg-orange-50 active:scale-[0.99]'
+                }`}
+              >
+                <LogOut className="w-5 h-5" />
+                {isTimedOut ? 'Shift Completed' : 'Tap to Time-Out'}
+              </button>
+            </div>
+          </section>
+
+          {/* Quick Shift Schedule Policy Sidebar on Desktop */}
+          <div className="hidden lg:block bg-white border-2 border-slate-200/80 rounded-3xl p-5 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                Daily Shift Policy
+              </span>
+              <span
+                className={`font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                  profile.auto_time_out !== false
+                    ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
+                    : 'bg-red-50 text-red-600 border border-red-200'
+                }`}
+              >
+                {profile.auto_time_out !== false ? 'Auto Time-Out Active' : 'Manual Time-Out'}
               </span>
             </div>
-            <div
-              suppressHydrationWarning
-              className="font-mono text-3xl sm:text-5xl font-bold tracking-tight text-white mt-1 tabular-nums"
-            >
-              {liveTimeStr}
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-700">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-slate-400 text-[10px] uppercase block">Shift Hours</span>
+                <span className="font-bold text-slate-900 mt-0.5 block">
+                  {profile.daily_start_time?.slice(0, 5) || '09:00'} - {profile.daily_end_time?.slice(0, 5) || '18:00'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-slate-400 text-[10px] uppercase block">Lunch Break</span>
+                <span className="font-bold text-slate-900 mt-0.5 block">
+                  {profile.lunch_break_minutes || 0}m deduction
+                </span>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Timestamps Strip */}
-        <div className="grid grid-cols-3 gap-2.5 mt-5">
-          <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
-            <span className="block font-mono text-[10px] uppercase text-slate-400">Time In</span>
-            <span
-              suppressHydrationWarning
-              className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
-            >
-              {formatTimeDisplay(todayLog?.time_in || null)}
-            </span>
-          </div>
-          <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
-            <span className="block font-mono text-[10px] uppercase text-slate-400">Time Out</span>
-            <span
-              suppressHydrationWarning
-              className="font-mono text-xs sm:text-base font-bold text-white mt-0.5 block"
-            >
-              {formatTimeDisplay(todayLog?.time_out || null)}
-            </span>
-          </div>
-          <div className="bg-[#201f1f] border border-white/10 rounded-2xl p-3">
-            <span className="block font-mono text-[10px] uppercase text-slate-400">Net Hours</span>
-            <span className="font-mono text-xs sm:text-base font-bold text-[#C44900] mt-0.5 block">
-              {liveNetHours ? formatHoursWhole(liveNetHours) : '0h'}
-            </span>
-          </div>
-        </div>
-
-        {/* Auto Time-Out Blocked Warning (Restriction 5a) */}
-        {autoTimeOutBlocked && (
-          <div className="mt-4 p-3.5 rounded-2xl bg-red-950/60 border border-red-500/50 text-red-100 flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <p className="font-mono text-[11px] leading-relaxed">
-              Your scheduled shift end ({profile.daily_end_time?.slice(0, 5) || '18:00'}) has passed, but auto time-out is paused because no task is checked under <strong>&ldquo;What did you work on?&rdquo;</strong> below.
+            <p className="font-mono text-[10.5px] text-slate-500 leading-relaxed">
+              Check off tasks as you finish them. At shift end, your daily accomplishment summary formats automatically.
             </p>
           </div>
-        )}
-
-        {/* Thumb-Friendly Punch Action Buttons */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            type="button"
-            disabled={isSaving || isTimedIn}
-            onClick={() => setPendingAction('time-in')}
-            className={`h-14 rounded-2xl font-clash-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
-              isTimedIn
-                ? 'bg-white/10 text-slate-400 cursor-not-allowed'
-                : 'bg-[#C44900] hover:bg-[#9E3B00] text-white shadow-[0_10px_28px_-6px_rgba(196,73,0,0.5)] active:scale-[0.99]'
-            }`}
-          >
-            <LogIn className="w-5 h-5" />
-            {isTimedIn ? 'Timed In Today' : 'Tap to Time-In'}
-          </button>
-
-          <button
-            type="button"
-            disabled={isSaving || !isTimedIn || isTimedOut}
-            onClick={handleManualTimeOut}
-            className={`h-14 rounded-2xl font-clash-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
-              !isTimedIn || isTimedOut
-                ? 'bg-white/10 text-slate-500 cursor-not-allowed'
-                : 'bg-white text-black hover:bg-orange-50 active:scale-[0.99]'
-            }`}
-          >
-            <LogOut className="w-5 h-5" />
-            {isTimedOut ? 'Shift Completed' : 'Tap to Time-Out'}
-          </button>
         </div>
-      </section>
 
-      {/* Smart Task Checklist & Auto-Formatted Weekly/Monthly Report Summary */}
-      <section className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
-              Daily Task Checklist
-            </span>
-            <h2 className="font-clash-semibold text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-              What did you work on?
-            </h2>
-          </div>
+        {/* Right Column (7 cols): Smart Task Checklist & Auto-Formatted Report Summary */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Card 1: Dedicated "What did you work on?" Task Checklist Card */}
+          <section className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
+                    Daily Task Checklist
+                  </span>
+                  {selectedTasks.length > 0 && (
+                    <span className="font-mono text-[10px] font-bold text-[#C44900] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+                      {selectedTasks.length} selected
+                    </span>
+                  )}
+                </div>
+                <h2 className="font-clash-semibold text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+                  What did you work on?
+                </h2>
+              </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               type="button"
@@ -1159,6 +1287,23 @@ export default function PunchClockCard({
             })}
           </div>
         )}
+      </section>
+
+      {/* Card 2: Dedicated "Shift Accomplishments & Reports" Card */}
+      <section className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
+        <div className="pb-2 border-b border-slate-100 flex items-center justify-between gap-2">
+          <div>
+            <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
+              Daily Documentation
+            </span>
+            <h3 className="font-clash-semibold text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
+              Shift Accomplishments &amp; Reports
+            </h3>
+          </div>
+          <span className="font-mono text-[10px] uppercase text-slate-400 hidden sm:inline">
+            Notes, Summary &amp; Photos
+          </span>
+        </div>
 
         <div
           className={`space-y-4 transition-opacity ${
@@ -1345,6 +1490,8 @@ export default function PunchClockCard({
           </button>
         </div>
       </section>
+    </div>
+  </div>
 
       <ConfirmModal
         isOpen={pendingAction !== null}
@@ -1362,11 +1509,11 @@ export default function PunchClockCard({
         }
         description={
           pendingAction === 'time-in'
-            ? `Record your Time-In for ${liveDateStr} at ${liveTimeStr}?`
+            ? `Record your Time-In for ${currentFormattedDate} at ${currentFormattedTime}?`
             : pendingAction === 'time-out'
-            ? `Complete your shift and record Time-Out at ${liveTimeStr}? Your selected tasks will be formatted automatically for your reports.`
+            ? `Complete your shift and record Time-Out at ${currentFormattedTime}? Your selected tasks will be formatted automatically for your reports.`
             : pendingAction === 'save-log'
-            ? `Save your checked tasks and accomplishment summary to your log for ${liveDateStr}? (You will remain clocked in until you tap Time-Out).`
+            ? `Save your checked tasks and accomplishment summary to your log for ${currentFormattedDate}? (You will remain clocked in until you tap Time-Out).`
             : pendingAction === 'format-notes'
             ? 'Format your custom notes (along with any checked tasks) into past-tense statements for the Weekly & Monthly Report Summary?'
             : "Save today's checked tasks and accomplishment summary to your attendance log?"
@@ -1398,4 +1545,6 @@ export default function PunchClockCard({
       />
     </div>
   );
-}
+});
+
+export default PunchClockCard;

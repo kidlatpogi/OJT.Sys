@@ -1,4 +1,4 @@
-import { AttendanceLog, UserProfile } from '@/types/ojt';
+import type { AttendanceLog, UserProfile } from '@/types/ojt';
 
 const PROFILE_KEY = 'ojt_demo_profile_v1';
 const LOGS_KEY = 'ojt_demo_logs_v1';
@@ -21,6 +21,7 @@ export const DEFAULT_DEMO_PROFILE: UserProfile = {
   daily_end_time: '18:00',
   lunch_break_minutes: 0,
   auto_time_out: true,
+  offline_sync: true,
   academic_term: 'TERM 2 AY 2025 - 2026',
 };
 

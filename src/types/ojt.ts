@@ -21,6 +21,7 @@ export interface UserProfile {
   daily_end_time: string;
   lunch_break_minutes: number;
   auto_time_out?: boolean;
+  offline_sync?: boolean;
   document_checklist?: string[];
   work_checklist?: ChecklistItem[];
   active_internship_id?: string | null;
@@ -42,6 +43,7 @@ export interface Internship {
   daily_end_time: string;
   lunch_break_minutes: number;
   auto_time_out?: boolean;
+  offline_sync?: boolean;
   document_checklist?: string[];
   academic_term: string;
   status: 'active' | 'completed' | 'archived';

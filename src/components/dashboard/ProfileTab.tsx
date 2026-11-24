@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LogOut, Save } from 'lucide-react';
 import { UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -16,7 +16,7 @@ interface ProfileTabProps {
   onSignOut: () => Promise<void>;
 }
 
-export default function ProfileTab({ profile, onSaveProfile, onSignOut }: ProfileTabProps) {
+const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSignOut }: ProfileTabProps) {
   const [formData, setFormData] = useState<StandardProfileFormData>(() => {
     const { firstName, lastName } = splitFullName(profile.full_name);
     return {
@@ -35,6 +35,7 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
     };
   });
   const [autoTimeOut, setAutoTimeOut] = useState(profile.auto_time_out !== false);
+  const [offlineSync, setOfflineSync] = useState(profile.offline_sync !== false);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -57,11 +58,12 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
       dailyEndTime: (profile.daily_end_time || '18:00').slice(0, 5),
     });
     setAutoTimeOut(profile.auto_time_out !== false);
+    setOfflineSync(profile.offline_sync !== false);
   }, [profile]);
 
-  const handleFieldChange = (field: keyof StandardProfileFormData, value: any) => {
+  const handleFieldChange = useCallback((field: keyof StandardProfileFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +82,7 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
       daily_start_time: formData.dailyStartTime,
       daily_end_time: formData.dailyEndTime,
       auto_time_out: autoTimeOut,
+      offline_sync: offlineSync,
     };
     await onSaveProfile(updatedProfile);
     setSaving(false);
@@ -88,13 +91,14 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-6 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
-            Onboarding &amp; Settings
+          <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">
+            Account &amp; Internship Settings
           </span>
-          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black">
+          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black mt-0.5">
             Trainee Profile
           </h2>
         </div>
@@ -102,47 +106,161 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
         <button
           type="button"
           onClick={() => setConfirmSignOut(true)}
-          className="h-10 px-3.5 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-1.5 cursor-pointer"
+          className="h-10 px-4 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign Out
         </button>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-6 space-y-5"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Core Profile Fields: Sectioned into Academic, Company & Shift Cards */}
         <StandardProfileFields formData={formData} onChange={handleFieldChange} />
 
-        {/* Auto Time-Out Configuration */}
-        <div className="pt-4 border-t border-slate-100 space-y-4">
-          <label className="flex items-start justify-between gap-4 p-4 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 cursor-pointer hover:border-[#C44900]/50 transition-colors">
-            <div>
-              <span className="block font-sans text-sm font-bold text-slate-900">
+        {/* SECTION 4: Shift Automation & Preferences Card */}
+        <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-5 sm:p-7 space-y-4 shadow-xs">
+          <div className="pb-2 border-b border-slate-100">
+            <h3 className="font-clash-semibold text-base sm:text-lg font-bold text-slate-900">
+              Shift Automation &amp; Preferences
+            </h3>
+            <p className="font-mono text-[10.5px] text-slate-500 uppercase tracking-wider mt-0.5">
+              Hands-Free Daily Attendance Processing
+            </p>
+          </div>
+
+          {/* Toggle Switch Row with Info button */}
+          <div className="flex items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 hover:border-slate-300 transition-colors">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="font-sans text-sm font-bold text-slate-900">
                 Enable Auto Time-Out at Shift End
               </span>
-              <span className="block font-mono text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                Automatically clocks you out when your shift end time arrives, only if at least one task under &ldquo;What did you work on?&rdquo; is checked. Hours round up to whole numbers (e.g. 9h).
+
+              {/* Active / Disabled badge: Placed directly after label */}
+              <span
+                className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                  autoTimeOut
+                    ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
+                    : 'bg-red-50 text-red-600 border border-red-200'
+                }`}
+              >
+                {autoTimeOut ? 'Active' : 'Disabled'}
               </span>
+
+              {/* Info "i" Hover Tooltip: Placed to the right side of the Active / Disabled badge */}
+              <div className="relative group inline-flex items-center">
+                <button
+                  type="button"
+                  tabIndex={0}
+                  aria-label="What is Auto Time-Out?"
+                  title="Automatically clocks you out when your scheduled shift end time arrives, only if at least one task under 'What did you work on?' is checked. Hours round up to whole numbers (e.g. 9h)."
+                  className="w-5 h-5 rounded-full border border-slate-300 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-500 flex items-center justify-center font-mono text-[11px] font-bold cursor-help transition-colors"
+                >
+                  i
+                </button>
+                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[85vw] p-2.5 bg-slate-900 text-white rounded-xl shadow-xl font-mono text-[10.5px] leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                  Automatically clocks you out when your scheduled shift end time arrives, only if at least one task under &ldquo;What did you work on?&rdquo; is checked. Hours round up to whole numbers (e.g. 9h).
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                </div>
+              </div>
             </div>
-            <input
-              type="checkbox"
-              checked={autoTimeOut}
-              onChange={(e) => setAutoTimeOut(e.target.checked)}
-              className="mt-1 w-5 h-5 accent-[#C44900] rounded cursor-pointer shrink-0"
-            />
-          </label>
+
+            {/* Toggle Switch Button */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoTimeOut}
+                aria-label="Enable Auto Time-Out at Shift End"
+                onClick={() => setAutoTimeOut((prev) => !prev)}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
+                  autoTimeOut ? 'bg-[#C44900]' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    autoTimeOut ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Toggle Switch Row 2: Local Save and Cloud Sync */}
+          <div className="flex items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 hover:border-slate-300 transition-colors">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="font-sans text-sm font-bold text-slate-900">
+                  Local Save and Cloud Sync
+                </span>
+
+                {/* Active / Disabled badge: Placed directly after label */}
+                <span
+                  className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    offlineSync
+                      ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
+                      : 'bg-red-50 text-red-600 border border-red-200'
+                  }`}
+                >
+                  {offlineSync ? 'Active' : 'Disabled'}
+                </span>
+
+                {/* Info "i" Hover Tooltip */}
+                <div className="relative group inline-flex items-center">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    aria-label="What is Local Save and Cloud Sync?"
+                    title="Stores your attendance punches locally with 0ms latency for seamless offline attendance, then automatically synchronizes with Supabase cloud when your connection is restored."
+                    className="w-5 h-5 rounded-full border border-slate-300 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-500 flex items-center justify-center font-mono text-[11px] font-bold cursor-help transition-colors"
+                  >
+                    i
+                  </button>
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[85vw] p-2.5 bg-slate-900 text-white rounded-xl shadow-xl font-mono text-[10.5px] leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                    Stores your attendance punches locally with 0ms latency for seamless offline attendance, then automatically synchronizes with Supabase cloud when your connection is restored.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                </div>
+              </div>
+              <p className="font-mono text-[10.5px] text-slate-500">
+                Offline Attendance &amp; Auto-Sync
+              </p>
+            </div>
+
+            {/* Toggle Switch Button */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={offlineSync}
+                aria-label="Local Save and Cloud Sync"
+                onClick={() => setOfflineSync((prev) => !prev)}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
+                  offlineSync ? 'bg-[#C44900]' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    offlineSync ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full h-12 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving Profile...' : savedNotice ? 'Profile Saved' : 'Save Settings'}
-        </button>
+        {/* Submit Action Button */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full sm:w-auto min-w-[200px] h-12 px-6 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-clash-semibold text-base inline-flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-[0.99] disabled:opacity-60"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving Profile...' : savedNotice ? 'Profile Saved ✓' : 'Save Settings'}
+          </button>
+        </div>
       </form>
 
       <ConfirmModal
@@ -150,7 +268,7 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
         loading={signingOut}
         variant="danger"
         title="Sign Out"
-        description="Are you sure you want to sign out of OJT.SYS? Your saved attendance logs will remain safely stored."
+        description="Are you sure you want to sign out of OJT.SYS? Your saved attendance logs and calendar records will remain safely stored."
         confirmLabel="Sign Out"
         onConfirm={async () => {
           setSigningOut(true);
@@ -162,4 +280,6 @@ export default function ProfileTab({ profile, onSaveProfile, onSignOut }: Profil
       />
     </div>
   );
-}
+});
+
+export default ProfileTab;
