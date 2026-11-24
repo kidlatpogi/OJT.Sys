@@ -21,6 +21,7 @@ import {
   ChangelogItem,
   WHATS_NEW_STORAGE_KEY,
 } from '@/config/changelog';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 
 export { CHANGELOG_ITEMS, WHATS_NEW_STORAGE_KEY };
 export type { ChangelogItem };
@@ -77,10 +78,10 @@ export default function WhatsNewModal({
     if (onClose) onClose();
   }, [onClose]);
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -90,7 +91,6 @@ export default function WhatsNewModal({
 
     window.addEventListener('keydown', onKeyDown);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen, handleDismiss]);
@@ -115,7 +115,7 @@ export default function WhatsNewModal({
         aria-modal="true"
         aria-labelledby="whats-new-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-white rounded-3xl p-5 sm:p-7 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] overflow-y-auto no-scrollbar my-auto space-y-5 animate-in fade-in-0 zoom-in-95 duration-200"
+        className="w-full max-w-3xl bg-white rounded-3xl p-5 sm:p-7 border-2 border-slate-200 shadow-2xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[88dvh] overflow-y-auto no-scrollbar overflow-x-hidden my-auto space-y-5 animate-in fade-in-0 zoom-in-95 duration-200"
       >
         {/* Top Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">

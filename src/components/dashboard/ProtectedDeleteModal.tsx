@@ -14,6 +14,7 @@ import {
 import { AttendanceLog } from '@/types/ojt';
 import { formatHoursWhole, formatReportDate } from '@/lib/ojt-calculations';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 
 export interface ProtectedDeleteModalProps {
   isOpen: boolean;
@@ -151,11 +152,12 @@ export default function ProtectedDeleteModal({
     onCancel();
   }, [isVerifying, loading, onCancel]);
 
-  // Handle ESC key and prevent body scroll when open
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(isOpen);
+
+  // Handle ESC key
   useEffect(() => {
     if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isVerifying && !loading) {
@@ -165,7 +167,6 @@ export default function ProtectedDeleteModal({
 
     window.addEventListener('keydown', onKeyDown);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen, isVerifying, loading, handleDismiss]);
@@ -228,7 +229,7 @@ export default function ProtectedDeleteModal({
         aria-labelledby="protected-delete-title"
         aria-describedby="protected-delete-desc"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-red-200 shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-red-200 shadow-2xl overflow-hidden no-scrollbar my-auto animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Contextual Header with ShieldAlert Icon */}
         <div className="flex items-start justify-between gap-3">

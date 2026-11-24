@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { formatReportDate } from '@/lib/ojt-calculations';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 
 export interface ImageModalProps {
   isOpen: boolean;
@@ -31,12 +32,12 @@ export default function ImageModal({
     }
   }, [isOpen, imageUrl]);
 
-  // Handle ESC key and scroll lock
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(isOpen);
+
+  // Handle ESC key
   useEffect(() => {
     if (!isOpen) return;
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -45,9 +46,7 @@ export default function ImageModal({
     };
 
     window.addEventListener('keydown', onKeyDown);
-
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen, onClose]);
@@ -109,7 +108,7 @@ export default function ImageModal({
         </div>
 
         {/* Content Body */}
-        <div className="overflow-y-auto py-3 space-y-3 flex-1 flex flex-col items-center">
+        <div className="overflow-y-auto no-scrollbar py-3 space-y-3 flex-1 flex flex-col items-center">
           <div
             className={`relative w-full rounded-2xl bg-black border border-slate-800 flex items-center justify-center min-h-[220px] transition-all ${
               isZoomed ? 'overflow-auto max-h-[68vh] p-2' : 'overflow-hidden'
