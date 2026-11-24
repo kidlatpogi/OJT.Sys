@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AttendanceLog, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 import {
   buildMonthlyRollups,
   computeAttendanceTotals,
@@ -52,6 +53,9 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('');
   const [pendingDownload, setPendingDownload] = useState<'pdf' | 'docx' | null>(null);
+
+  // Global scroll lock: prevent background page scrolling while PDF preview modal is open
+  useBodyScrollLock(Boolean(previewPdfUrl));
 
   const sortedLogs = useMemo(
     () => [...logs].sort((a, b) => a.date.localeCompare(b.date)),
@@ -576,7 +580,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
         typeof document !== 'undefined' &&
         createPortal(
           <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <div className="max-w-5xl w-full h-[84dvh] sm:h-[88dvh] mx-auto bg-white rounded-2xl sm:rounded-3xl border-2 border-slate-200 flex flex-col overflow-hidden shadow-2xl">
+            <div className="max-w-5xl w-full h-[84dvh] sm:h-[88dvh] mx-auto bg-white rounded-2xl sm:rounded-3xl border-2 border-slate-200 flex flex-col overflow-hidden no-scrollbar shadow-2xl">
               <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-[#C44900] font-bold block">

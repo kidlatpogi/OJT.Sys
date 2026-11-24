@@ -19,6 +19,7 @@ import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
 import ImageModal from '@/components/ImageModal';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 import {
   calculateShiftHours,
   formatHoursWhole,
@@ -75,6 +76,9 @@ export default function LogsTab({
   const [summary, setSummary] = useState('');
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [emptySummaryModalOpen, setEmptySummaryModalOpen] = useState(false);
+
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(isModalOpen);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceLog | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -603,7 +607,7 @@ export default function LogsTab({
         typeof document !== 'undefined' &&
         createPortal(
           <div className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto shadow-2xl my-auto">
+            <div className="w-full max-w-md bg-white rounded-3xl p-4 sm:p-6 border-2 border-slate-200 max-h-[calc(100dvh-2.5rem)] sm:max-h-[85dvh] overflow-y-auto no-scrollbar overflow-x-hidden shadow-2xl my-auto">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#C44900] font-bold">

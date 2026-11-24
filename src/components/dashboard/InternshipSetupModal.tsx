@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, X } from 'lucide-react';
 import { Internship, UserProfile } from '@/types/ojt';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 import StandardProfileFields, {
   combineFullName,
   splitFullName,
@@ -84,6 +85,19 @@ export default function InternshipSetupModal({
 
   const [saving, setSaving] = useState(false);
 
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(true);
+
+  // Handle ESC key to close modal if dismissable
+  useEffect(() => {
+    if (!onClose) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, saving]);
+
   const handleFieldChange = (field: keyof StandardProfileFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -157,8 +171,8 @@ export default function InternshipSetupModal({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[105] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-8 border-2 border-slate-200 max-h-[84dvh] overflow-y-auto shadow-2xl relative">
+    <div className="fixed inset-0 z-[105] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-2xl sm:max-w-3xl bg-white rounded-3xl p-5 sm:p-8 border-2 border-slate-200 max-h-[88dvh] overflow-y-auto no-scrollbar overflow-x-hidden shadow-2xl relative my-auto animate-in fade-in-0 zoom-in-95 duration-200">
         {onClose && (
           <button
             type="button"

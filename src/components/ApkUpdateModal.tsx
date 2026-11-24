@@ -11,6 +11,7 @@ import {
   LANDING_PAGE_APK_SECTION,
   compareSemver,
 } from '@/config/version';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 
 interface ApkUpdateModalProps {
   forceShow?: boolean;
@@ -21,6 +22,9 @@ export default function ApkUpdateModal({ forceShow = false }: ApkUpdateModalProp
   const [isOpen, setIsOpen] = useState(false);
   const [installedVer, setInstalledVer] = useState<string>('1.2.0');
   const [mounted, setMounted] = useState(false);
+
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     setMounted(true);
@@ -110,7 +114,7 @@ export default function ApkUpdateModal({ forceShow = false }: ApkUpdateModalProp
         aria-modal="true"
         aria-labelledby="apk-update-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-orange-200 shadow-2xl space-y-4 animate-in fade-in-0 zoom-in-95 duration-200"
+        className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 border-2 border-orange-200 shadow-2xl space-y-4 no-scrollbar overflow-x-hidden animate-in fade-in-0 zoom-in-95 duration-200"
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">

@@ -24,6 +24,7 @@ import {
   saveCalendarEntry,
   uploadCalendarImage,
 } from '@/lib/calendar-service';
+import { useBodyScrollLock } from '@/lib/scroll-lock';
 
 export interface DayActivityModalProps {
   isOpen: boolean;
@@ -77,11 +78,12 @@ export default function DayActivityModal({
     }
   }, [isOpen, date, initialEntry, dayLog]);
 
-  // Handle escape key and body scroll lock
+  // Global scroll lock: prevent background page scrolling while modal is open
+  useBodyScrollLock(isOpen);
+
+  // Handle escape key
   useEffect(() => {
     if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isUploading && !isDeleting) {
@@ -91,7 +93,6 @@ export default function DayActivityModal({
     window.addEventListener('keydown', onKey);
 
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKey);
     };
   }, [isOpen, isUploading, isDeleting, onClose]);
@@ -247,7 +248,7 @@ export default function DayActivityModal({
         </div>
 
         {/* Modal Body */}
-        <div className="overflow-y-auto py-3 space-y-3.5 flex-1 pr-1 overscroll-contain">
+        <div className="overflow-y-auto no-scrollbar py-3 space-y-3.5 flex-1 pr-1 overscroll-contain">
           {/* Notifications */}
           {errorMessage && (
             <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-mono">
