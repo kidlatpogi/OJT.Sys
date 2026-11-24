@@ -170,18 +170,18 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="no-print flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div className="space-y-5">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
-            Official Templates
+          <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">
+            Official Academic Deliverables
           </span>
-          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black">
+          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black mt-0.5">
             OJT Reports
           </h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-2xl">
+        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-2xl self-start sm:self-auto">
           {[
             { id: '003' as const, label: 'Attendance' },
             { id: '004' as const, label: 'Weekly Report' },
@@ -191,7 +191,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
               key={tab.id}
               type="button"
               onClick={() => setActiveReport(tab.id)}
-              className={`px-2 sm:px-3 py-2 rounded-xl font-mono text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-xl font-mono text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
                 activeReport === tab.id
                   ? 'bg-white text-[#C44900] shadow-xs'
                   : 'text-slate-600 hover:text-black'
@@ -204,34 +204,34 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
       </div>
 
       {/* Period Controls + Preview / DOCX / PDF Export */}
-      <div className="no-print bg-white border-2 border-slate-200/80 rounded-2xl p-4 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
+      <div className="no-print bg-white border-2 border-slate-200/80 rounded-3xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs">
+        <div className="flex flex-wrap items-center gap-3">
           {activeReport === '004' && (
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 aria-label="Previous week"
                 onClick={() => setWeekRefDate((d) => shiftDateDays(d, -7))}
-                className="h-10 w-10 rounded-xl border border-slate-200 hover:border-slate-400 flex items-center justify-center cursor-pointer"
+                className="h-10 w-10 rounded-xl border border-slate-200 hover:border-slate-400 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <div>
                 <span className="block font-mono text-[10px] uppercase text-slate-400 font-bold">
-                  Week ({weekBounds.label})
+                  Target Week ({weekBounds.label})
                 </span>
                 <input
                   type="date"
                   value={weekRefDate}
                   onChange={(e) => setWeekRefDate(e.target.value)}
-                  className="h-8 px-2 rounded-lg border border-slate-200 text-xs font-mono"
+                  className="h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-mono focus:border-[#C44900] focus:outline-none"
                 />
               </div>
               <button
                 type="button"
                 aria-label="Next week"
                 onClick={() => setWeekRefDate((d) => shiftDateDays(d, 7))}
-                className="h-10 w-10 rounded-xl border border-slate-200 hover:border-slate-400 flex items-center justify-center cursor-pointer"
+                className="h-10 w-10 rounded-xl border border-slate-200 hover:border-slate-400 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -240,15 +240,15 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
 
           {activeReport === '005' && (
             <div>
-              <label className="block font-mono text-[10px] uppercase text-slate-400 font-bold">
-                Report Month (Finalizes 1st of Next Month)
-              </label>
+              <span className="block font-mono text-[10px] uppercase text-slate-400 font-bold">
+                Report Month (Rolls Up Completed Weeks)
+              </span>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <input
                   type="month"
                   value={monthFilter}
                   onChange={(e) => setMonthFilter(e.target.value)}
-                  className="h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono"
+                  className="h-9 px-3 rounded-xl border border-slate-200 text-xs font-mono focus:border-[#C44900] focus:outline-none"
                 />
                 <span
                   className={`font-mono text-[10px] px-2.5 py-1 rounded-full font-semibold ${
@@ -265,27 +265,27 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
 
           {activeReport === '003' && (
             <div className="font-mono text-xs text-slate-600">
-              Latest <strong>{periodLogs.length}</strong> of 12 daily attendance rows
+              Showing latest <strong className="text-slate-900">{periodLogs.length}</strong> of 12 daily attendance rows for current reporting period.
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
           <button
             type="button"
             disabled={previewLoading}
             onClick={handleOpenPreview}
-            className="h-11 px-3 rounded-xl bg-slate-900 hover:bg-black disabled:opacity-60 text-white font-mono text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+            className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-black disabled:opacity-60 text-white font-mono text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <Eye className="w-4 h-4" />
-            <span>{previewLoading ? 'Loading...' : 'Preview'}</span>
+            <span>{previewLoading ? 'Loading...' : '1:1 Preview'}</span>
           </button>
 
           <button
             type="button"
             disabled={exportingFormat !== null}
             onClick={() => setPendingDownload('docx')}
-            className="h-11 px-3 rounded-xl border-2 border-slate-200 hover:border-slate-900 disabled:opacity-60 font-mono text-xs font-bold text-slate-800 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+            className="h-11 px-4 rounded-xl border-2 border-slate-200 hover:border-slate-900 disabled:opacity-60 font-mono text-xs font-bold text-slate-800 inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
           >
             <FileText className="w-4 h-4" />
             <span>{exportingFormat === 'docx' ? 'Building...' : 'DOCX'}</span>
@@ -295,7 +295,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
             type="button"
             disabled={exportingFormat !== null}
             onClick={() => setPendingDownload('pdf')}
-            className="h-11 px-3 rounded-xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 text-white font-mono text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+            className="h-11 px-4 rounded-xl bg-[#C44900] hover:bg-[#9E3B00] disabled:opacity-60 text-white font-mono text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <Download className="w-4 h-4" />
             <span>{exportingFormat === 'pdf' ? 'Saving...' : 'PDF'}</span>
@@ -310,9 +310,9 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
       </div>
 
       {/* Horizontally Scrollable 1:1 Official Template Sheet Preview */}
-      <div className="print-only-card bg-white border-2 border-slate-200/80 rounded-3xl p-3 sm:p-6 w-full overflow-x-auto touch-pan-x">
+      <div className="print-only-card bg-white border-2 border-neutral-200/90 shadow-sm rounded-3xl p-3 sm:p-8 w-full overflow-x-auto touch-pan-x flex justify-center">
         {activeReport === '003' && (
-          <div className="w-[700px] mx-auto space-y-4 text-black p-2 sm:p-4">
+          <div className="w-[700px] mx-auto space-y-4 text-black bg-white p-2 sm:p-4">
             <img
               src="/seca-header.png"
               alt="NU Dasmariñas School of Engineering, Computing, and Architecture"
@@ -343,7 +343,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
                     <strong>NOTE:</strong> To be filled up by the intern and signed by the Internship Supervisor/immediate supervisor on a daily basis. This must be submitted to the Internship Coordinator along with the weekly activity report.
                   </td>
                 </tr>
-                <tr className="bg-slate-100 font-bold text-center">
+                <tr className="bg-neutral-100 font-bold text-center">
                   <td className="border border-black p-1.5 w-36">Date</td>
                   <td className="border border-black p-1.5">Time-In</td>
                   <td className="border border-black p-1.5">Time-Out</td>
@@ -440,7 +440,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
 
             <table className="w-full text-xs border-collapse border border-black">
               <thead>
-                <tr className="bg-slate-100 font-bold text-center">
+                <tr className="bg-neutral-100 font-bold text-center">
                   <th className="border border-black p-2 w-40">DATE</th>
                   <th className="border border-black p-2">DAILY ACCOMPLISHMENTS</th>
                   <th className="border border-black p-2 w-32">NO. OF WORKING HOURS</th>
@@ -519,7 +519,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
 
             <table className="w-full text-xs border-collapse border border-black">
               <thead>
-                <tr className="bg-slate-100 font-bold text-center">
+                <tr className="bg-neutral-100 font-bold text-center">
                   <th className="border border-black p-2 w-44">DATE</th>
                   <th className="border border-black p-2">WEEKLY ACCOMPLISHMENTS</th>
                   <th className="border border-black p-2 w-32">NO. OF WORKING HOURS</th>
@@ -622,7 +622,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
                 </div>
               </div>
 
-              <div className="flex-1 bg-slate-100 p-2 sm:p-4 overflow-hidden flex flex-col">
+              <div className="flex-1 bg-neutral-100 p-2 sm:p-4 overflow-hidden flex flex-col">
                 <iframe
                   src={previewPdfUrl}
                   title={previewTitle}

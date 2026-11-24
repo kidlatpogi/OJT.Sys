@@ -16,7 +16,7 @@ import {
 import ShapeGrid from '@/components/ShapeGrid';
 import BrandMark from '@/components/BrandMark';
 import LandingNavActions from '@/components/LandingNavActions';
-import WhatsNewBanner from '@/components/WhatsNewBanner';
+import WhatsNewModal from '@/components/WhatsNewModal';
 
 const reportCards = [
   {
@@ -74,8 +74,8 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-16">
-        {/* One-time What's New Announcement Banner */}
-        <WhatsNewBanner className="mb-6 sm:mb-8" />
+        {/* One-time What's New Announcement Modal */}
+        <WhatsNewModal />
 
         <div className="max-w-3xl">
           <h1 className="font-clash-semibold text-[2.5rem] leading-[0.95] sm:text-6xl md:text-7xl font-bold tracking-tighter text-black">

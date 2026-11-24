@@ -2,7 +2,19 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, CalendarPlus, Camera, Clock, Moon, Pencil, Trash2, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CalendarPlus,
+  Camera,
+  Clock,
+  Filter,
+  Moon,
+  Pencil,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { AttendanceLog, CalendarEntry, UserProfile } from '@/types/ojt';
 import ConfirmModal from '@/components/ConfirmModal';
 import ProtectedDeleteModal from '@/components/dashboard/ProtectedDeleteModal';
@@ -28,6 +40,23 @@ interface LogsTabProps {
   onDeleteLog: (id: string) => Promise<void>;
 }
 
+const MONTHS_LIST = [
+  { value: '01', label: 'Jan' },
+  { value: '02', label: 'Feb' },
+  { value: '03', label: 'Mar' },
+  { value: '04', label: 'Apr' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'Jun' },
+  { value: '07', label: 'Jul' },
+  { value: '08', label: 'Aug' },
+  { value: '09', label: 'Sep' },
+  { value: '10', label: 'Oct' },
+  { value: '11', label: 'Nov' },
+  { value: '12', label: 'Dec' },
+];
+
+const DAYS_LIST = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
+
 export default function LogsTab({
   profile,
   logs,
@@ -49,6 +78,14 @@ export default function LogsTab({
   const [deleteTarget, setDeleteTarget] = useState<AttendanceLog | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Search & Filter & Sort state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterYear, setFilterYear] = useState('all');
+  const [filterMonth, setFilterMonth] = useState('all');
+  const [filterDay, setFilterDay] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+
   const [entries, setEntries] = useState<CalendarEntry[]>(calendarEntries || []);
   const [lightboxPhoto, setLightboxPhoto] = useState<{
     imageUrl: string;
@@ -65,6 +102,7 @@ export default function LogsTab({
 
   useEffect(() => {
     if (!profile.id) return;
+    if (calendarEntries !== undefined) return;
     let active = true;
     fetchCalendarEntries(profile.id).then((data) => {
       if (active && data) {
@@ -74,7 +112,7 @@ export default function LogsTab({
     return () => {
       active = false;
     };
-  }, [profile.id, logs, calendarEntries]);
+  }, [profile.id, calendarEntries]);
 
   const calendarMap = useMemo(() => {
     const map = new Map<string, CalendarEntry>();
@@ -84,7 +122,77 @@ export default function LogsTab({
     return map;
   }, [entries]);
 
-  const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  const availableYears = useMemo(() => {
+    const set = new Set<string>();
+    logs.forEach((l) => {
+      if (l.date) set.add(l.date.slice(0, 4));
+    });
+    return Array.from(set).sort().reverse();
+  }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    let result = [...logs];
+
+    // 1. Year filter
+    if (filterYear !== 'all') {
+      result = result.filter((l) => l.date.startsWith(filterYear));
+    }
+
+    // 2. Month filter
+    if (filterMonth !== 'all') {
+      result = result.filter((l) => {
+        const parts = l.date.split('-');
+        return parts[1] === filterMonth;
+      });
+    }
+
+    // 3. Day filter
+    if (filterDay !== 'all') {
+      result = result.filter((l) => {
+        const parts = l.date.split('-');
+        return parts[2] === filterDay;
+      });
+    }
+
+    // 4. Keyword / task / date search
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((l) => {
+        const cal = calendarMap.get(l.date);
+        const matchDate = l.date.toLowerCase().includes(q) || formatReportDate(l.date).toLowerCase().includes(q);
+        const matchSummary = (l.ai_summary || '').toLowerCase().includes(q);
+        const matchCustom = (l.custom_tasks || '').toLowerCase().includes(q);
+        const matchTitle = (cal?.title || '').toLowerCase().includes(q);
+        const matchDesc = (cal?.description || '').toLowerCase().includes(q);
+        const matchTasks = (l.tasks_selected || []).some((t) => t.toLowerCase().includes(q));
+        return matchDate || matchSummary || matchCustom || matchTitle || matchDesc || matchTasks;
+      });
+    }
+
+    // 5. Sort by Day / Date
+    result.sort((a, b) => {
+      return sortOrder === 'desc'
+        ? b.date.localeCompare(a.date)
+        : a.date.localeCompare(b.date);
+    });
+
+    return result;
+  }, [logs, filterYear, filterMonth, filterDay, searchQuery, sortOrder, calendarMap]);
+
+  const hasActiveFilter =
+    searchQuery.trim() !== '' ||
+    filterYear !== 'all' ||
+    filterMonth !== 'all' ||
+    filterDay !== 'all' ||
+    sortOrder !== 'desc';
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setFilterYear('all');
+    setFilterMonth('all');
+    setFilterDay('all');
+    setSortOrder('desc');
+  };
 
   const openNewModal = () => {
     setEditing(null);
@@ -171,38 +279,221 @@ export default function LogsTab({
     }
   };
 
+  const totalLoggedHours = useMemo(() => {
+    return logs.reduce((sum, l) => sum + (Number(l.hours_worked) || 0), 0);
+  }, [logs]);
+
+  const avgShiftHours = useMemo(() => {
+    if (logs.length === 0) return 0;
+    return Math.round((totalLoggedHours / logs.length) * 10) / 10;
+  }, [logs.length, totalLoggedHours]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-5">
+      {/* Top Header & Quick Add */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">
             Attendance Ledger
           </span>
-          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black">
-            Daily Logs ({sorted.length})
+          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black mt-0.5">
+            Daily Logs ({logs.length})
           </h2>
         </div>
 
         <button
           type="button"
           onClick={openNewModal}
-          className="h-11 px-4 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-mono text-xs uppercase font-bold inline-flex items-center gap-2 cursor-pointer"
+          className="h-11 px-4 rounded-2xl bg-[#C44900] hover:bg-[#9E3B00] text-white font-mono text-xs uppercase font-bold inline-flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] self-start sm:self-auto"
         >
           <CalendarPlus className="w-4 h-4" />
-          Add Log
+          Add OJT Day Log
         </button>
       </div>
 
-      {sorted.length === 0 ? (
-        <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-8 text-center">
+      {/* Metrics Summary Strip */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border-2 border-slate-200/80 rounded-2xl p-3.5 sm:p-4">
+          <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
+            Total Logged
+          </span>
+          <span className="font-clash-semibold text-xl sm:text-2xl font-bold text-[#C44900] mt-0.5 block">
+            {formatHoursWhole(totalLoggedHours)}
+          </span>
+        </div>
+        <div className="bg-white border-2 border-slate-200/80 rounded-2xl p-3.5 sm:p-4">
+          <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
+            Completed Shifts
+          </span>
+          <span className="font-clash-semibold text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 block">
+            {logs.length} {logs.length === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+        <div className="bg-white border-2 border-slate-200/80 rounded-2xl p-3.5 sm:p-4">
+          <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
+            Avg Shift
+          </span>
+          <span className="font-clash-semibold text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 block">
+            {avgShiftHours}h
+          </span>
+        </div>
+      </div>
+
+      {/* Search & Sort Controls Toolbar */}
+      <div className="bg-white border-2 border-slate-200/80 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Top Row on Mobile: Search Bar + Mobile Filters Toggle */}
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search logs by keyword, task, or date..."
+                className="w-full h-11 pl-10 pr-9 rounded-xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none text-xs font-mono text-slate-900 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Filter Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsFilterExpanded((prev) => !prev)}
+              className={`sm:hidden h-11 px-3 rounded-xl border-2 font-mono text-xs font-bold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer relative ${
+                isFilterExpanded || (filterYear !== 'all' || filterMonth !== 'all' || filterDay !== 'all' || sortOrder !== 'desc')
+                  ? 'border-[#C44900] bg-orange-50/70 text-[#C44900]'
+                  : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-100'
+              }`}
+              aria-label="Toggle filter and sort options"
+              aria-expanded={isFilterExpanded}
+            >
+              <Filter className="w-4 h-4" />
+              <span>Filters</span>
+              {(filterYear !== 'all' || filterMonth !== 'all' || filterDay !== 'all' || sortOrder !== 'desc') && (
+                <span className="w-2 h-2 rounded-full bg-[#C44900]" />
+              )}
+            </button>
+          </div>
+
+          {/* Filter & Sort Controls: Collapsible on mobile (<640px), permanently inline on desktop (sm:) */}
+          <div
+            className={`${
+              isFilterExpanded ? 'flex' : 'hidden'
+            } sm:flex items-center gap-2 flex-wrap pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100`}
+          >
+            {/* Year Selector */}
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="h-11 px-3 rounded-xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none font-mono text-xs text-slate-700 cursor-pointer"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
+
+            {/* Month Selector */}
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="h-11 px-3 rounded-xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none font-mono text-xs text-slate-700 cursor-pointer"
+            >
+              <option value="all">All Months</option>
+              {MONTHS_LIST.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label} ({m.value})
+                </option>
+              ))}
+            </select>
+
+            {/* Day Selector */}
+            <select
+              value={filterDay}
+              onChange={(e) => setFilterDay(e.target.value)}
+              className="h-11 px-3 rounded-xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none font-mono text-xs text-slate-700 cursor-pointer"
+            >
+              <option value="all">All Days</option>
+              {DAYS_LIST.map((d) => (
+                <option key={d} value={d}>
+                  Day {d}
+                </option>
+              ))}
+            </select>
+
+            {/* Sort by Day / Date */}
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
+              className="h-11 px-3 rounded-xl border-2 border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#C44900] focus:outline-none font-mono text-xs font-bold text-slate-700 cursor-pointer"
+            >
+              <option value="desc">Newest First</option>
+              <option value="asc">Oldest First</option>
+            </select>
+
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="h-11 px-3 rounded-xl border-2 border-slate-200 hover:border-slate-400 bg-white font-mono text-xs font-bold text-slate-600 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Reset filters"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Status count indicator */}
+        <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-1 border-t border-slate-100">
+          <span>
+            Showing <strong className="text-slate-900">{filteredLogs.length}</strong> of{' '}
+            {logs.length} logs
+          </span>
+          {hasActiveFilter && (
+            <span className="text-[#C44900] font-bold">Filters Active</span>
+          )}
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-8 sm:p-12 text-center shadow-xs">
+          <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="font-clash-semibold text-lg text-slate-900">No attendance logs yet</p>
-          <p className="text-sm text-slate-500 mt-1">
-            Tap Time-In on the Clock tab or use Add Log to backfill an earlier day.
+          <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+            Tap Time-In on the Clock tab or click &ldquo;Add OJT Day Log&rdquo; above to record your first daily shift.
           </p>
         </div>
+      ) : filteredLogs.length === 0 ? (
+        <div className="bg-white border-2 border-slate-200/80 rounded-3xl p-8 text-center shadow-xs space-y-2">
+          <p className="font-clash-semibold text-base text-slate-900">No logs match your filter criteria</p>
+          <p className="text-xs font-mono text-slate-500">
+            Try adjusting your search terms, year, month, or day.
+          </p>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="mt-2 h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            Clear Filters
+          </button>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {sorted.map((log) => {
+        /* ITEM 4: Show logs in "ONE" column only */
+        <div className="space-y-3.5">
+          {filteredLogs.map((log) => {
             const calEntry = calendarMap.get(log.date);
             const hasPhoto = Boolean(calEntry?.image_url);
             const displayTitle = calEntry?.title || 'What did you work on?';
@@ -211,7 +502,7 @@ export default function LogsTab({
             return (
               <article
                 key={log.id}
-                className="bg-white border-2 border-slate-200/80 hover:border-[#C44900] rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-colors"
+                className="bg-white border-2 border-slate-200/80 hover:border-[#C44900] rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-colors shadow-xs"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -292,12 +583,12 @@ export default function LogsTab({
                   </div>
                 )}
 
-                {/* Accomplishments Summary (shown when distinct from displayNotes or when no photo) */}
+                {/* Accomplishments Summary */}
                 {(log.ai_summary || log.custom_tasks || log.tasks_selected.length > 0) &&
                   (!hasPhoto ||
                     (log.ai_summary !== displayNotes &&
                       (log.ai_summary || log.custom_tasks || log.tasks_selected.join(', ')) !== displayNotes)) && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                    <div className="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed font-sans">
                       {log.ai_summary || log.custom_tasks || log.tasks_selected.join(', ')}
                     </div>
                   )}
@@ -379,55 +670,53 @@ export default function LogsTab({
                     <div className="flex items-start gap-2 text-xs font-mono text-amber-900">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold">Time Out is earlier than Time In (0h worked).</span>
-                        <p className="text-[11px] text-amber-700 mt-0.5">
-                          Did you mean PM, or is this an overnight shift?
-                        </p>
+                        <strong>Notice:</strong> Time-out appears earlier than or equal to time-in ({timeIn} → {timeOut}), resulting in 0 net hours.
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200/60">
+                      {/* 1-Click Fix to PM button if timeOut is in AM (01:00 - 11:59) */}
                       {parseInt(timeOut.split(':')[0], 10) < 12 && (
                         <button
                           type="button"
                           onClick={() => {
-                            const [h, m] = timeOut.split(':');
-                            const pmH = parseInt(h, 10) + 12;
-                            setTimeOut(`${String(pmH).padStart(2, '0')}:${m}`);
+                            const [h, m] = timeOut.split(':').map(Number);
+                            const newH = String((h + 12) % 24).padStart(2, '0');
+                            setTimeOut(`${newH}:${String(m).padStart(2, '0')}`);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-[#C44900] hover:bg-[#9E3B00] text-white text-[11px] font-mono font-bold cursor-pointer transition-colors"
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-mono text-[11px] font-bold cursor-pointer transition-colors"
                         >
-                          Switch to PM ({parseInt(timeOut.split(':')[0], 10) + 12}:{timeOut.split(':')[1]})
+                          Switch to PM ({((parseInt(timeOut.split(':')[0], 10) + 12) % 24).toString().padStart(2, '0')}:{timeOut.split(':')[1]})
                         </button>
                       )}
+                      {/* Overnight shift toggle */}
                       <button
                         type="button"
                         onClick={() => setIsOvernight(true)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-900 text-[11px] font-mono font-bold cursor-pointer transition-colors inline-flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg border border-amber-400 text-amber-800 hover:bg-amber-100 font-mono text-[11px] font-semibold cursor-pointer transition-colors"
                       >
-                        <Moon className="w-3 h-3" />
                         Overnight (+1 day)
                       </button>
                     </div>
                   </div>
-                ) : isOvernight ? (
-                  <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between gap-2 text-xs font-mono text-indigo-900">
-                    <span className="inline-flex items-center gap-1.5 font-bold">
-                      <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                      Overnight shift enabled (ends next day)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsOvernight(false)}
-                      className="text-[11px] text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Disable
-                    </button>
-                  </div>
                 ) : null}
 
-                {/* Live Shift Preview Bar */}
-                <div className="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs font-mono">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                {/* Overnight Badge and Toggle */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="font-mono text-xs text-slate-700">Overnight Shift (Ends next calendar day)</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isOvernight}
+                    onChange={(e) => setIsOvernight(e.target.checked)}
+                    className="w-4 h-4 accent-[#C44900] rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* Live shift calculation preview */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs font-mono">
+                  <span className="text-slate-500">
                     Shift Preview:
                   </span>
                   <div className="flex items-center gap-2">
@@ -466,7 +755,7 @@ export default function LogsTab({
                     value={summary}
                     onChange={(e) => setSummary(e.target.value)}
                     placeholder="• Implemented API route..."
-                    className="w-full p-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none text-sm"
+                    className="w-full p-3.5 rounded-xl border-2 border-slate-200 focus:border-[#C44900] focus:outline-none text-sm font-sans"
                   />
                 </div>
 
@@ -532,4 +821,3 @@ export default function LogsTab({
     </div>
   );
 }
-

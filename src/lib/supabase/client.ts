@@ -11,9 +11,17 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
+let cachedClient: ReturnType<typeof createBrowserClient> | null = null;
+
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  if (typeof window !== 'undefined') {
+    if (!cachedClient) {
+      cachedClient = createBrowserClient(url, key);
+    }
+    return cachedClient;
+  }
   return createBrowserClient(url, key);
 }
 

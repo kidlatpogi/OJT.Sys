@@ -1,9 +1,46 @@
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
-import { CalendarEntry } from '@/types/ojt';
+import type { CalendarEntry } from '@/types/ojt';
 import { isValidUuid } from '@/lib/internship-service';
 
 const CALENDAR_STORAGE_BUCKET = 'calendar-images';
 const DEMO_CALENDAR_KEY = 'ojt_demo_calendar_entries_v1';
+export const LOCAL_CALENDAR_PREFIX = 'ojt_local_calendar_entries_';
+
+export function getLocalCalendarEntries(userId: string): CalendarEntry[] {
+  if (typeof window === 'undefined' || !userId) return [];
+  try {
+    const raw = localStorage.getItem(`${LOCAL_CALENDAR_PREFIX}${userId}`);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Failed to parse local calendar entries cache:', err);
+    return [];
+  }
+}
+
+export function saveLocalCalendarEntries(userId: string, entries: CalendarEntry[]): void {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    localStorage.setItem(`${LOCAL_CALENDAR_PREFIX}${userId}`, JSON.stringify(entries));
+  } catch (err) {
+    console.warn('Failed to persist local calendar entries cache:', err);
+  }
+}
+
+function isAuthError(error: any): boolean {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const status = Number(error.status || 0);
+  const msg = String(error.message || '').toLowerCase();
+  return (
+    code === 'PGRST301' ||
+    status === 401 ||
+    msg.includes('401') ||
+    msg.includes('jwt') ||
+    msg.includes('unauthorized') ||
+    msg.includes('token expired')
+  );
+}
 
 /**
  * Client-side canvas image compressor.
@@ -70,9 +107,30 @@ export async function fetchCalendarEntries(
   userId: string,
   internshipId?: string | null
 ): Promise<CalendarEntry[]> {
+  // If offline, return immediately from local storage cache
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const local = getLocalCalendarEntries(userId);
+    if (internshipId) {
+      return local.filter((e) => e.internship_id === internshipId);
+    }
+    return local;
+  }
+
   if (isSupabaseConfigured() && isValidUuid(userId)) {
     try {
       const supabase = createClient();
+
+      // Proactive session check: verify session validity before querying
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        if (!session || (session.expires_at && session.expires_at * 1000 - Date.now() < 60000)) {
+          await supabase.auth.refreshSession();
+        }
+      } catch (authCheckErr) {
+        console.warn('Proactive auth check failed:', authCheckErr);
+      }
+
       let query = supabase
         .from('calendar_entries')
         .select('*')
@@ -84,7 +142,29 @@ export async function fetchCalendarEntries(
 
       let { data, error } = await query.order('date', { ascending: false });
 
-      if (error && internshipId) {
+      // If 401 / PGRST301 error, attempt ONE session refresh and retry query
+      if (error && isAuthError(error)) {
+        console.warn('Received 401 Unauthorized from calendar_entries, attempting session refresh and retry...');
+        try {
+          const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+          if (!refreshErr && refreshData?.session) {
+            let retryQuery = supabase
+              .from('calendar_entries')
+              .select('*')
+              .eq('user_id', userId);
+            if (internshipId && isValidUuid(internshipId)) {
+              retryQuery = retryQuery.eq('internship_id', internshipId);
+            }
+            const retryRes = await retryQuery.order('date', { ascending: false });
+            data = retryRes.data;
+            error = retryRes.error;
+          }
+        } catch (refreshCatchErr) {
+          console.warn('Session refresh retry attempt failed:', refreshCatchErr);
+        }
+      }
+
+      if (error && internshipId && !isAuthError(error)) {
         console.warn('Calendar entries query with internship_id failed, falling back:', error);
         const fallback = await supabase
           .from('calendar_entries')
@@ -96,12 +176,32 @@ export async function fetchCalendarEntries(
       }
 
       if (error) {
-        console.error('Error fetching calendar entries from Supabase:', error);
+        console.warn('Gracefully handling calendar entries query error, falling back to local cache:', error.message || error);
+        const local = getLocalCalendarEntries(userId);
+        if (local.length > 0) {
+          if (internshipId) {
+            return local.filter((e) => e.internship_id === internshipId);
+          }
+          return local;
+        }
         return [];
       }
-      return (data as CalendarEntry[]) || [];
+
+      const results = (data as CalendarEntry[]) || [];
+      // On successful network query, update local cache
+      if (results.length > 0) {
+        saveLocalCalendarEntries(userId, results);
+      }
+      return results;
     } catch (err) {
-      console.error('Unexpected error fetching calendar entries:', err);
+      console.warn('Unexpected error fetching calendar entries, falling back to local cache:', err);
+      const local = getLocalCalendarEntries(userId);
+      if (local.length > 0) {
+        if (internshipId) {
+          return local.filter((e) => e.internship_id === internshipId);
+        }
+        return local;
+      }
       return [];
     }
   }
@@ -128,9 +228,25 @@ export async function fetchCalendarEntryByDate(
   date: string,
   internshipId?: string | null
 ): Promise<CalendarEntry | null> {
+  // If offline, check local cache first
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const local = getLocalCalendarEntries(userId);
+    return local.find((e) => e.date === date && (!internshipId || e.internship_id === internshipId)) || null;
+  }
+
   if (isSupabaseConfigured() && isValidUuid(userId)) {
     try {
       const supabase = createClient();
+
+      // Proactive session check
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        if (!session || (session.expires_at && session.expires_at * 1000 - Date.now() < 60000)) {
+          await supabase.auth.refreshSession();
+        }
+      } catch {}
+
       let query = supabase
         .from('calendar_entries')
         .select('*')
@@ -143,7 +259,26 @@ export async function fetchCalendarEntryByDate(
 
       let { data, error } = await query.maybeSingle();
 
-      if (error && internshipId) {
+      if (error && isAuthError(error)) {
+        try {
+          const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+          if (!refreshErr && refreshData?.session) {
+            let retryQuery = supabase
+              .from('calendar_entries')
+              .select('*')
+              .eq('user_id', userId)
+              .eq('date', date);
+            if (internshipId && isValidUuid(internshipId)) {
+              retryQuery = retryQuery.eq('internship_id', internshipId);
+            }
+            const retryRes = await retryQuery.maybeSingle();
+            data = retryRes.data;
+            error = retryRes.error;
+          }
+        } catch {}
+      }
+
+      if (error && internshipId && !isAuthError(error)) {
         console.warn('Calendar single query with internship_id failed, retrying without filter:', error);
         const fallback = await supabase
           .from('calendar_entries')
@@ -156,13 +291,15 @@ export async function fetchCalendarEntryByDate(
       }
 
       if (error) {
-        console.error('Error fetching calendar entry by date:', error);
-        return null;
+        console.warn('Error fetching calendar entry by date, falling back to local cache:', error.message || error);
+        const local = getLocalCalendarEntries(userId);
+        return local.find((e) => e.date === date && (!internshipId || e.internship_id === internshipId)) || null;
       }
       return (data as CalendarEntry) || null;
     } catch (err) {
-      console.error('Unexpected error fetching calendar entry by date:', err);
-      return null;
+      console.warn('Unexpected error fetching calendar entry by date, falling back to local cache:', err);
+      const local = getLocalCalendarEntries(userId);
+      return local.find((e) => e.date === date && (!internshipId || e.internship_id === internshipId)) || null;
     }
   }
 
@@ -226,6 +363,24 @@ export async function saveCalendarEntry(
   const trimmedDesc = description.trim();
   const trimmedTitle = title.trim() || 'What did you work on?';
 
+  // Optimistic local cache update for fast offline reactivity
+  const existingLocal = getLocalCalendarEntries(userId);
+  const optimisticLocalEntry: CalendarEntry = {
+    id: `local-cal-${Date.now()}`,
+    user_id: userId,
+    internship_id: internshipId || null,
+    date,
+    image_url: imageUrl,
+    title: trimmedTitle,
+    description: trimmedDesc,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  saveLocalCalendarEntries(userId, [
+    optimisticLocalEntry,
+    ...existingLocal.filter((item) => item.date !== date),
+  ]);
+
   if (isSupabaseConfigured() && isValidUuid(userId)) {
     const supabase = createClient();
     const payload: Record<string, any> = {
@@ -261,7 +416,15 @@ export async function saveCalendarEntry(
       throw new Error(`Failed to save calendar entry: ${error.message}`);
     }
 
-    return data as CalendarEntry;
+    const saved = data as CalendarEntry;
+    // Persist confirmed server record to local cache
+    const currentLocal = getLocalCalendarEntries(userId);
+    saveLocalCalendarEntries(userId, [
+      saved,
+      ...currentLocal.filter((item) => item.date !== date),
+    ]);
+
+    return saved;
   }
 
   // Demo mode fallback
@@ -300,6 +463,13 @@ export async function deleteCalendarEntry(
   date: string,
   imageUrl?: string
 ): Promise<void> {
+  // Optimistically remove from local cache
+  const localList = getLocalCalendarEntries(userId);
+  saveLocalCalendarEntries(
+    userId,
+    localList.filter((item) => item.date !== date)
+  );
+
   if (isSupabaseConfigured() && isValidUuid(userId)) {
     const supabase = createClient();
 

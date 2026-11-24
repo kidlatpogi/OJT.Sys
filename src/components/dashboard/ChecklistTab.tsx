@@ -225,23 +225,23 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-array-semibold text-xs uppercase tracking-[0.2em] text-[#334155]">
-            Required Files
+          <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">
+            Required Academic &amp; OJT Filings
           </span>
-          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black">
-            OJT Document Checklist
+          <h2 className="font-clash-semibold text-2xl sm:text-3xl font-bold text-black mt-0.5">
+            Document Checklist
           </h2>
         </div>
 
         <button
           type="button"
           onClick={() => setConfirmResetOpen(true)}
-          className="h-10 px-3 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-600 inline-flex items-center gap-1.5 cursor-pointer"
+          className="h-10 px-3.5 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-600 inline-flex items-center gap-1.5 cursor-pointer transition-colors self-start sm:self-auto"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          Reset
+          Reset Checklist
         </button>
       </div>
 
@@ -297,53 +297,60 @@ export default function ChecklistTab({ userId }: ChecklistTabProps) {
         ))}
       </div>
 
-      {/* Grouped Checklist Sections */}
-      <div className="space-y-5">
+      {/* Grouped Checklist Sections in Responsive Multi-Column Grid */}
+      <div className="space-y-6">
         {visibleGroups.map((group) => (
-          <section key={group.phase} className="space-y-2.5">
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-700 px-1">
-              {group.label}
-            </h3>
+          <section key={group.phase} className="space-y-3.5 pt-2">
+            <div className="flex items-center justify-between px-1 pb-2 border-b-2 border-slate-200/80">
+              <h1 className="font-clash-semibold text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                {group.label}
+              </h1>
+              <span className="font-mono text-xs font-bold text-slate-600 uppercase px-3 py-1 bg-slate-100 rounded-full shrink-0">
+                {group.items.filter((i) => checkedIds.includes(i.id)).length} / {group.items.length} done
+              </span>
+            </div>
 
-            {group.items.map((item) => {
-              const checked = checkedIds.includes(item.id);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggleItem(item.id)}
-                  className={`w-full text-left p-4 rounded-2xl sm:rounded-3xl border-2 transition-all flex items-start gap-3.5 cursor-pointer ${
-                    checked
-                      ? 'bg-orange-50/70 border-[#C44900]'
-                      : 'bg-white border-slate-200/80 hover:border-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {group.items.map((item) => {
+                const checked = checkedIds.includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleItem(item.id)}
+                    className={`w-full text-left p-4 rounded-2xl sm:rounded-3xl border-2 transition-all flex items-start gap-3.5 cursor-pointer ${
                       checked
-                        ? 'bg-[#C44900] text-white'
-                        : 'bg-slate-50 border-2 border-slate-300'
+                        ? 'bg-orange-50/70 border-[#C44900]'
+                        : 'bg-white border-slate-200/80 hover:border-slate-300'
                     }`}
                   >
-                    {checked && <Check className="w-3.5 h-3.5" />}
-                  </span>
-
-                  <div className="flex-1 min-w-0">
-                    <h4
-                      className={`font-clash-semibold text-base sm:text-lg font-bold leading-snug ${
-                        checked ? 'line-through text-slate-500' : 'text-slate-900'
+                    <span
+                      className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        checked
+                          ? 'bg-[#C44900] text-white'
+                          : 'bg-slate-50 border-2 border-slate-300'
                       }`}
                     >
-                      {item.title}
-                    </h4>
+                      {checked && <Check className="w-3.5 h-3.5" />}
+                    </span>
 
-                    <p className="font-sans text-xs sm:text-sm text-slate-600 leading-relaxed mt-1">
-                      {item.description}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="flex-1 min-w-0">
+                      <h4
+                        className={`font-clash-semibold text-base sm:text-lg font-bold leading-snug ${
+                          checked ? 'line-through text-slate-500' : 'text-slate-900'
+                        }`}
+                      >
+                        {item.title}
+                      </h4>
+
+                      <p className="font-sans text-xs sm:text-sm text-slate-600 leading-relaxed mt-1">
+                        {item.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </section>
         ))}
       </div>
