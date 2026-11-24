@@ -14,9 +14,15 @@ interface ProfileTabProps {
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => Promise<void>;
   onSignOut: () => Promise<void>;
+  navLayout?: 'top' | 'rail';
 }
 
-const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSignOut }: ProfileTabProps) {
+const ProfileTab = React.memo(function ProfileTab({
+  profile,
+  onSaveProfile,
+  onSignOut,
+  navLayout = 'top',
+}: ProfileTabProps) {
   const [formData, setFormData] = useState<StandardProfileFormData>(() => {
     const { firstName, lastName } = splitFullName(profile.full_name);
     return {
@@ -36,10 +42,40 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
   });
   const [autoTimeOut, setAutoTimeOut] = useState(profile.auto_time_out !== false);
   const [offlineSync, setOfflineSync] = useState(profile.offline_sync !== false);
+  const [sideRailNav, setSideRailNav] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    try {
+      setSideRailNav(localStorage.getItem('ojt_nav_layout') === 'rail');
+    } catch {
+      setSideRailNav(false);
+    }
+    const checkMobile = () => {
+      setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const handleToggleSideRail = () => {
+    if (isMobile) return;
+    const next = !sideRailNav;
+    setSideRailNav(next);
+    try {
+      localStorage.setItem('ojt_nav_layout', next ? 'rail' : 'top');
+      setTimeout(() => {
+        window.dispatchEvent(new Event('ojt_nav_layout_change'));
+      }, 0);
+    } catch (err) {
+      console.warn('Failed to save nav layout preference:', err);
+    }
+  };
 
   useEffect(() => {
     const { firstName, lastName } = splitFullName(profile.full_name);
@@ -91,7 +127,7 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
   };
 
   return (
-    <div className="space-y-6 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+    <div className="space-y-6 pb-36 sm:pb-36 lg:pb-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] lg:pb-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -106,7 +142,9 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
         <button
           type="button"
           onClick={() => setConfirmSignOut(true)}
-          className="h-10 px-4 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto"
+          className={`h-10 px-4 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:text-red-600 font-mono text-xs font-bold text-slate-700 inline-flex items-center gap-2 cursor-pointer transition-colors self-start sm:self-auto ${
+            navLayout === 'rail' ? 'sm:hidden' : ''
+          }`}
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign Out
@@ -243,6 +281,79 @@ const ProfileTab = React.memo(function ProfileTab({ profile, onSaveProfile, onSi
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
                     offlineSync ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Toggle Switch Row 3: Desktop Side Railway Navigation */}
+          <div className="flex items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border-2 border-slate-200/90 bg-slate-50/70 hover:border-slate-300 transition-colors">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="font-sans text-sm font-bold text-slate-900">
+                  Desktop Side Railway Navigation
+                </span>
+
+                {/* Active / Disabled / Desktop Only badge */}
+                <span
+                  className={`font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    isMobile
+                      ? 'bg-slate-200/80 text-slate-600 border border-slate-300'
+                      : sideRailNav
+                      ? 'bg-orange-50 text-[#C44900] border border-[#C44900]/40'
+                      : 'bg-red-50 text-red-600 border border-red-200'
+                  }`}
+                >
+                  {isMobile ? 'Desktop Only' : sideRailNav ? 'Active' : 'Disabled'}
+                </span>
+
+                {/* Info "i" Hover Tooltip */}
+                <div className="relative group inline-flex items-center">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    aria-label="What is Desktop Side Railway Navigation?"
+                    title="Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking."
+                    className="w-5 h-5 rounded-full border border-slate-300 bg-white hover:border-[#C44900] hover:text-[#C44900] text-slate-500 flex items-center justify-center font-mono text-[11px] font-bold cursor-help transition-colors"
+                  >
+                    i
+                  </button>
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[85vw] p-2.5 bg-slate-900 text-white rounded-xl shadow-xl font-mono text-[10.5px] leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                    Switches the desktop navigation bar from a top header menu into a left-side vertical navigation rail for quick access and multi-tasking. Disabled on mobile viewports.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                </div>
+              </div>
+              <p className="font-mono text-[11px] text-slate-500">
+                {isMobile
+                  ? 'Disabled on mobile viewports. This layout feature is only active on desktop screens (≥1024px).'
+                  : 'Display navigation menu as a vertical side rail along the left side of the screen on desktop viewports.'}
+              </p>
+            </div>
+
+            {/* Toggle Switch Button */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!isMobile && sideRailNav}
+                aria-label="Desktop Side Railway Navigation"
+                disabled={isMobile}
+                onClick={handleToggleSideRail}
+                className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#C44900] focus:ring-offset-2 ${
+                  isMobile
+                    ? 'opacity-40 cursor-not-allowed bg-slate-300'
+                    : sideRailNav
+                    ? 'cursor-pointer bg-[#C44900]'
+                    : 'cursor-pointer bg-slate-300'
+                }`}
+                title={isMobile ? 'Desktop Side Railway Navigation is disabled on mobile devices' : undefined}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    !isMobile && sideRailNav ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

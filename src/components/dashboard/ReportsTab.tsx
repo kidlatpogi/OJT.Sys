@@ -125,14 +125,14 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
       if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
       const url = URL.createObjectURL(blob);
       const titleMap = {
-        '003': 'Daily Attendance Report (1:1 Preview)',
-        '004': 'Weekly Accomplishment Report (1:1 Preview)',
-        '005': 'Monthly Accomplishment Report (1:1 Preview)',
+        '003': 'Daily Attendance Report (Preview)',
+        '004': 'Weekly Accomplishment Report (Preview)',
+        '005': 'Monthly Accomplishment Report (Preview)',
       };
       setPreviewTitle(titleMap[activeReport]);
       setPreviewPdfUrl(url);
     } catch {
-      alert('Could not generate 1:1 preview. Please try again.');
+      alert('Could not generate preview. Please try again.');
     } finally {
       setPreviewLoading(false);
     }
@@ -170,7 +170,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
   };
 
   return (
-    <div className="space-y-5 pb-36 sm:pb-40 pb-[calc(env(safe-area-inset-bottom)+7.5rem)]">
+    <div className="space-y-5 pb-36 sm:pb-36 lg:pb-6 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] lg:pb-6">
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="font-mono text-[11px] uppercase tracking-wider text-[#C44900] font-bold">
@@ -278,7 +278,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
             className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-black disabled:opacity-60 text-white font-mono text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <Eye className="w-4 h-4" />
-            <span>{previewLoading ? 'Loading...' : '1:1 Preview'}</span>
+            <span>{previewLoading ? 'Loading...' : 'Preview'}</span>
           </button>
 
           <button
@@ -306,7 +306,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
       {/* Mobile Horizontal Scroll Hint */}
       <div className="no-print sm:hidden flex items-center justify-center gap-1.5 font-mono text-[11px] text-slate-500">
         <MoveHorizontal className="w-3.5 h-3.5 text-[#C44900]" />
-        <span>Swipe left or right to view full 1:1 document page</span>
+        <span>Swipe left or right to view full document page</span>
       </div>
 
       {/* Horizontally Scrollable 1:1 Official Template Sheet Preview */}
@@ -580,7 +580,7 @@ export default function ReportsTab({ profile, logs }: ReportsTabProps) {
               <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="font-mono text-[10px] uppercase tracking-wider text-[#C44900] font-bold block">
-                    1:1 PDF Document Preview
+                    PDF Document Preview
                   </span>
                   <h3 className="font-clash-semibold text-base sm:text-lg font-bold text-black truncate">
                     {previewTitle}

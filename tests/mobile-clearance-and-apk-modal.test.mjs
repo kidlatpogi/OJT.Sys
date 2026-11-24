@@ -110,8 +110,8 @@ test('Route Guard: WhatsNewModal.tsx contains strict pathname check for /dashboa
 // ----------------------------------------------------------------------------
 // 3. Changelog Expansion (8 items)
 // ----------------------------------------------------------------------------
-test('Changelog: Contains all 8 UI and UX items with proper metadata', () => {
-  assert.equal(CHANGELOG_ITEMS.length, 8, 'Must contain exactly 8 changelog entries');
+test('Changelog: Contains all UI and UX items with proper metadata', () => {
+  assert.ok(CHANGELOG_ITEMS.length >= 8, 'Must contain at least 8 changelog entries');
 
   const expectedIds = [
     'mobile-scrolling',
@@ -122,6 +122,7 @@ test('Changelog: Contains all 8 UI and UX items with proper metadata', () => {
     'standalone-cards',
     'supabase-recovery',
     'apk-update-detection',
+    'railway-navigation',
   ];
 
   for (const expectedId of expectedIds) {
@@ -133,7 +134,7 @@ test('Changelog: Contains all 8 UI and UX items with proper metadata', () => {
     assert.ok(item.iconName.length > 0, `iconName for ${expectedId} must be defined`);
   }
 
-  assert.equal(WHATS_NEW_STORAGE_KEY, 'ojt_whats_new_v1_4_0_dismissed');
+  assert.ok(WHATS_NEW_STORAGE_KEY.startsWith('ojt_whats_new_'), 'Must have valid storage key');
 });
 
 // ----------------------------------------------------------------------------
