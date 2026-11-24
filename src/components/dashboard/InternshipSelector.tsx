@@ -96,10 +96,10 @@ export default function InternshipSelector({
                   Done
                 </span>
               ) : (
-                <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Active Program">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C44900] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white" />
-                </span>
+                <span
+                  className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white shrink-0 ml-0.5"
+                  title="Active Program"
+                />
               )}
             </div>
             {(variant === 'mobile-strip' || variant === 'railway') && activeInternship?.company_name && (
@@ -124,14 +124,16 @@ export default function InternshipSelector({
           role="listbox"
           aria-label="Internship Programs"
           className={`absolute ${
-            variant === 'railway' ? 'left-0 mt-1.5 w-72' : 'left-0 sm:left-auto sm:right-0 mt-1.5 w-72 sm:w-80'
-          } rounded-2xl bg-white border-2 border-slate-200 shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100`}
+            variant === 'railway'
+              ? 'left-0 right-0 bottom-full mb-2 w-full shadow-2xl'
+              : 'left-0 sm:left-auto sm:right-0 mt-1.5 w-72 sm:w-80 shadow-xl'
+          } rounded-2xl bg-white border-2 border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-100`}
         >
-          <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-              Internship Programs ({internships.length})
+          <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold truncate">
+              {variant === 'railway' ? `Programs (${internships.length})` : `Internship Programs (${internships.length})`}
             </span>
-            <span className="font-mono text-[10px] text-slate-400">Switch active</span>
+            <span className="font-mono text-[10px] text-slate-400 shrink-0">Switch active</span>
           </div>
 
           <div className="max-h-60 overflow-y-auto py-1 space-y-1">
@@ -145,7 +147,9 @@ export default function InternshipSelector({
               return (
                 <div
                   key={internship.id}
-                  className={`w-full px-3.5 py-2.5 text-left flex items-start gap-2 transition-colors ${
+                  className={`w-full ${
+                    variant === 'railway' ? 'px-3 py-2' : 'px-3.5 py-2.5'
+                  } text-left flex items-start gap-1.5 transition-colors ${
                     isSelected
                       ? 'bg-[#C44900]/8 text-slate-900 border-l-4 border-[#C44900]'
                       : 'hover:bg-slate-50 text-slate-700'
@@ -159,7 +163,7 @@ export default function InternshipSelector({
                       onSelectInternship(internship.id);
                       setIsOpen(false);
                     }}
-                    className="flex-1 text-left flex items-start gap-2.5 cursor-pointer min-w-0"
+                    className="flex-1 text-left flex items-start gap-2 cursor-pointer min-w-0"
                   >
                     <div className="mt-0.5 shrink-0">
                       <div
@@ -183,10 +187,10 @@ export default function InternshipSelector({
                             Completed
                           </span>
                         ) : (
-                          <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Active Program">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C44900] opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white" />
-                          </span>
+                          <span
+                            className="relative inline-flex rounded-full h-2 w-2 bg-[#C44900] ring-2 ring-white shrink-0 ml-0.5"
+                            title="Active Program"
+                          />
                         )}
                       </div>
 
@@ -214,7 +218,7 @@ export default function InternshipSelector({
                     </div>
                   </button>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-1 mt-0.5">
+                  <div className="flex items-center gap-0.5 shrink-0 ml-1 mt-0.5">
                     {onEditInternship && (
                       <button
                         type="button"

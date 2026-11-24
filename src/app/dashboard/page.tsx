@@ -896,34 +896,15 @@ export default function DashboardPage() {
 
       {/* Desktop Left Side Navigation Rail */}
       {navLayout === 'rail' && (
-        <aside className="no-print hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white/95 backdrop-blur-md border-r border-slate-200/90 h-screen p-4 justify-between z-30 select-none shadow-xs overflow-y-auto no-scrollbar">
-          <div className="space-y-4">
+        <aside className="no-print hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white/95 backdrop-blur-md border-r border-slate-200/90 h-screen p-4 justify-between z-30 select-none shadow-xs">
+          <div className="flex-1 min-h-0 flex flex-col space-y-4">
             {/* Brand Logo (Single BrandMark, no duplicate text) */}
-            <div className="px-1 py-1">
+            <div className="px-1 py-1 shrink-0">
               <BrandMark href="/dashboard" onClick={() => setActiveTab('clock')} />
             </div>
 
-            {/* Internship Programs Switcher */}
-            {internships.length > 0 && (
-              <div className="pt-0.5">
-                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5 px-1">
-                  Active Program
-                </span>
-                <InternshipSelector
-                  internships={internships}
-                  activeInternshipId={activeInternshipId}
-                  onSelectInternship={handleSelectInternship}
-                  onAddNewInternship={handleRequestAddInternship}
-                  onEditInternship={(i) => setEditingInternship(i)}
-                  onDeleteInternship={(i) => setDeletingInternship(i)}
-                  getInternshipHours={getInternshipHours}
-                  variant="railway"
-                />
-              </div>
-            )}
-
-            {/* Navigation items */}
-            <nav className="space-y-1.5 pt-1" aria-label="Side rail navigation">
+            {/* Navigation items (scrollable if viewport height is small) */}
+            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pt-1" aria-label="Side rail navigation">
               {NAV_ITEMS.map((item) => {
                 const isActive = activeTab === item.key;
                 return (
@@ -946,41 +927,63 @@ export default function DashboardPage() {
             </nav>
           </div>
 
-          {/* Bottom rail user info, status & Sign Out */}
-          <div className="pt-3 border-t border-slate-100 space-y-2.5">
-            {!isOnline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold w-full justify-start">
-                <WifiOff className="w-3 h-3 text-amber-600 shrink-0" />
-                <span>Offline</span>
-              </span>
-            ) : isSyncing ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold w-full justify-start">
-                <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />
-                <span>Syncing...</span>
-              </span>
-            ) : null}
-
-            <div className="px-1">
-              <span className="text-[10.5px] font-mono text-slate-400 block truncate font-medium">
-                {effectiveProfile.full_name}
-              </span>
-              {effectiveProfile.company_name && (
-                <span className="text-[10px] font-mono text-slate-400 block truncate">
-                  {effectiveProfile.company_name}
+          {/* Bottom rail: Active Program (above hr) & user info, status & Sign Out */}
+          <div className="shrink-0 pt-3 relative space-y-3">
+            {/* Internship Programs Switcher - placed directly above the hr of the name */}
+            {internships.length > 0 && (
+              <div className="relative">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5 px-1">
+                  Active Program
                 </span>
-              )}
-            </div>
+                <InternshipSelector
+                  internships={internships}
+                  activeInternshipId={activeInternshipId}
+                  onSelectInternship={handleSelectInternship}
+                  onAddNewInternship={handleRequestAddInternship}
+                  onEditInternship={(i) => setEditingInternship(i)}
+                  onDeleteInternship={(i) => setDeletingInternship(i)}
+                  getInternshipHours={getInternshipHours}
+                  variant="railway"
+                />
+              </div>
+            )}
 
-            {/* Dedicated Railway Sign Out Button */}
-            <button
-              type="button"
-              onClick={() => setShowSignOutConfirm(true)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-mono text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200/80 hover:border-red-200 transition-colors cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>Sign Out</span>
-            </button>
+            {/* Bottom rail user info, status & Sign Out */}
+            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+              {!isOnline ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 font-mono text-[10px] font-bold w-full justify-start">
+                  <WifiOff className="w-3 h-3 text-amber-600 shrink-0" />
+                  <span>Offline</span>
+                </span>
+              ) : isSyncing ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 font-mono text-[10px] font-bold w-full justify-start">
+                  <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />
+                  <span>Syncing...</span>
+                </span>
+              ) : null}
+
+              <div className="px-1">
+                <span className="text-[10.5px] font-mono text-slate-400 block truncate font-medium">
+                  {effectiveProfile.full_name}
+                </span>
+                {effectiveProfile.company_name && (
+                  <span className="text-[10px] font-mono text-slate-400 block truncate">
+                    {effectiveProfile.company_name}
+                  </span>
+                )}
+              </div>
+
+              {/* Dedicated Railway Sign Out Button */}
+              <button
+                type="button"
+                onClick={() => setShowSignOutConfirm(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-mono text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200/80 hover:border-red-200 transition-colors cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
         </aside>
       )}
